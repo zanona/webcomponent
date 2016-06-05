@@ -1,0 +1,14 @@
+<!doctype html>
+<style>
+  body {
+    color: white;
+    background: #2A303A;
+  }
+</style>
+<x-foo foo=bar></x-foo>
+<script src=../index.js></script>
+<script>
+  setTimeout(() => { module.import('x-foo');});
+  setTimeout(() => { module.import('x-get');});
+  setTimeout(() => { module.import('x-test');});
+</script>

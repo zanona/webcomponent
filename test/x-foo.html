@@ -1,0 +1,26 @@
+<template>
+  <style>
+    :host {
+      display: block;
+      outline: 1px solid red;
+    }
+    :host::before {
+      content: 'VALUE:' attr(receiver);
+    }
+  </style>
+  <input>
+  <x-get path=[[endpoint]] response={{data}}></x-get>
+  <p test=[[name]]>This is [[data]]</p>
+  <x-test pil=BMDD foo=[[name]]></x-test>
+  <h1>PAYLOAD [[data]]</h1>
+</template>
+<script>
+  module.exports = class extends window.WebComponent {
+    created() {
+      const input = this.shadowRoot.querySelector('input');
+      input.addEventListener('input',() => {
+        this.set('name', input.value);
+      });
+    }
+  };
+</script>

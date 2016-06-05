@@ -1,0 +1,29 @@
+{
+  "name": "webcomponent",
+  "version": "0.1.0",
+  "description": "A different approach to web-components",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "bs-less ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zanona/webcomponent.git"
+  },
+  "keywords": [
+    "webcomponents",
+    "polymer",
+    "components",
+    "bindings",
+    "data-binding"
+  ],
+  "author": "Marcus Zanona <zanona@me.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zanona/webcomponent/issues"
+  },
+  "homepage": "https://github.com/zanona/webcomponent#readme"
+}

@@ -1,0 +1,9 @@
+<script>
+module.exports = class extends window.WebComponent {
+  created() {
+    setInterval(() => {
+      this.set('response', new Date().toTimeString().split(' ')[0]);
+    }, 1000);
+  }
+};
+</script>
