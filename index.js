@@ -11,7 +11,7 @@ function importComponent(name) {
     const doc      = link.import,
           template = doc.querySelector('template'),
           exported = doc.exports;
-    if (template) { exported.attachTemplate(template); }
+    if (template && exported) { exported.attachTemplate(template); }
     document.imported[name] = exported;
     document.registerElement(name, exported);
   });
@@ -35,12 +35,12 @@ class CoreWebComponent extends HTMLElement {
           template = document.importNode(this.constructor.template, true);
     shadowRoot.appendChild(template);
   }
-  _linkTemplate() {
-    const shadowRoot = this.createShadowRoot(),
-          template = document.importNode(this.constructor.template, true);
-    shadowRoot.appendChild(template);
-  }
   createdCallback() {
+    // RELYING ON DOCUMENT.IMPORTED SINCE THE POLYFILL MESSES UP WITH
+    // CONSTRUCTOR OBJECTS
+    if (!this.constructor.name) {
+      this.constructor = document.imported[this.nodeName.toLowerCase()];
+    }
     if (this.constructor.template) { this._linkTemplate(); }
     if (this.created) this.created();
     this._analyse();
