@@ -15,6 +15,7 @@ function importComponent(name) {
     document.imported[name] = exported;
     document.registerElement(name, exported);
   });
+  return this;
 }
 
 Object.defineProperty(window, 'module', {
