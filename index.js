@@ -198,8 +198,8 @@ class WebComponent extends CoreWebComponent {
       }
     }
     for (const child of Array.from(node.childNodes)) {
-      Object.defineProperty(child, '_ownerInstance', {value: this});
-      //child._ownerInstance = this;
+      //Object.defineProperty(child, '_ownerInstance', {value: this});
+      child._ownerInstance = this;
       this._dig(child);
     }
   }
