@@ -47,6 +47,7 @@ class CoreWebComponent extends HTMLElement {
   }
   attachedCallback() {
     this._analyse();
+    if (this.attached) this.attached();
   }
 }
 
