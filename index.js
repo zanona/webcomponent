@@ -43,6 +43,8 @@ class CoreWebComponent extends HTMLElement {
     }
     if (this.constructor.template) { this._linkTemplate(); }
     if (this.created) this.created();
+  }
+  attachedCallback() {
     this._analyse();
   }
 }
@@ -120,7 +122,7 @@ class Observer extends CoreWebComponent {
 
 class WebComponent extends CoreWebComponent {
   _searchBindings(text) {
-    const tag = /([\[\{]){2}([a-z-\.\_]+)[\]\}]{2}/gi,
+    const tag = /([\[\{]){2}([a-z-\.\_$]+)[\]\}]{2}/gi,
           bindings = [];
     text.replace(tag, (raw, type, key) => {
       bindings.push({
@@ -194,16 +196,23 @@ class WebComponent extends CoreWebComponent {
       }
     }
     for (const child of Array.from(node.childNodes)) {
-      child._ownerInstance = this;
+      Object.defineProperty(child, '_ownerInstance', {value: this});
+      //child._ownerInstance = this;
       this._dig(child);
     }
   }
   _analyse() {
     console.log('--------', this.nodeName, '--------');
-    this._bindings  = {};
+    Object.defineProperty(this, '_bindings', { value: {}
+    });
 
     this._dig(this);
     if (this.shadowRoot) { this._dig(this.shadowRoot); }
+
+    //APPLY INITIAL VALUES
+    for (const p in this) {
+      if (this.hasOwnProperty(p)) { this.set(p, this[p]); }
+    }
   }
   set(key, value) {
     this[key] = value;
@@ -220,7 +229,9 @@ class WebComponent extends CoreWebComponent {
       //UPDATE ATTRIBUTES
       let content = listener.originalValue;
       this._searchBindings(content).forEach((b) => {
-        content = content.replace(b.raw, listener.host[key]);
+        content = content.replace(b.raw, (m) => {
+          return listener.host[b.key] || m;
+        });
       });
       listener.node.textContent = content;
     }

@@ -13,7 +13,7 @@
 <script src=https://cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.22/webcomponents.min.js></script>
 <script src=../index.js></script>
 <script>
+  setTimeout(() => { module.import('x-get');},  0);
   setTimeout(() => { module.import('x-foo');},  100);
-  setTimeout(() => { module.import('x-get');},  200);
-  setTimeout(() => { module.import('x-test');}, 300);
+  setTimeout(() => { module.import('x-test');}, 200);
 </script>

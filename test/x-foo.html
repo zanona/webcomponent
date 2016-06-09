@@ -10,9 +10,11 @@
   </style>
   <input>
   <x-get path=[[endpoint]] response={{data}}></x-get>
+  <x-get path=[[endpoint]] response={{datab}}></x-get>
   <p test=[[name]]>This is [[data]]</p>
   <x-test pil=BMDD foo=[[name]]></x-test>
   <h1>PAYLOAD [[data]]</h1>
+  <h1>DATAB [[datab]]</h1>
 </template>
 <script>
   module.exports = class extends window.WebComponent {

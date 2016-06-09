@@ -2,13 +2,15 @@
   <style>:host { color: tomato; }</style>
   <h1>INSIDE: [[foo]] %%% [[foo]]</h1>
   [[name]] [[blog]]
+  <x-get test=[[title$]] path=[[endpoint]] response={{datac}}></x-get>
   <content></content>
-  <h4 atri=[[pimba]]>[[title]] and rest of content</h4>
+  <h4 atri=[[pimba]]>[[title$]] and rest of content [[teeDee]]</h4>
+  <h1 blabla=[[title$]]>DATAC [[datac]]</h1>
 </template>
 <script>
 module.exports = class extends window.WebComponent {
   created() {
-    this.title = 'HELLO MY WORLD';
+    this.title$ = 'HELLO MY WORLD';
     this.name = 'Marcus Zanona';
     this.pimba = 'hello';
   }
