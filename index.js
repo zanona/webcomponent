@@ -37,6 +37,7 @@ class CoreWebComponent extends HTMLElement {
     shadowRoot.appendChild(template);
   }
   createdCallback() {
+    Object.defineProperty(this, '_bindings', { value: {} });
     // RELYING ON DOCUMENT.IMPORTED SINCE THE POLYFILL MESSES UP WITH
     // CONSTRUCTOR OBJECTS
     if (!this.constructor.name) {
@@ -134,8 +135,6 @@ class WebComponent extends CoreWebComponent {
   }
   _analyse() {
     console.log('--------', this.nodeName, '--------');
-    Object.defineProperty(this, '_bindings', { value: {}
-    });
 
     this._dig(this);
     if (this.shadowRoot) { this._dig(this.shadowRoot); }
