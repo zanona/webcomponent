@@ -103,7 +103,7 @@ class WebComponent extends CoreWebComponent {
     const bindings = this._searchBindings(node.textContent);
     for (const binding of bindings) { this._bind(node, binding); }
 
-    if (node.nodeType === Node.ATTRIBUTE_NODE && node instanceof WebComponent) {
+    if (node.nodeType === Node.ATTRIBUTE_NODE && node._ownerElement instanceof WebComponent) {
       //console.log('ASSIGNING', node.nodeName, '=' , node.textContent);
       node._ownerElement.set(node.nodeName, node.textContent);
     }
