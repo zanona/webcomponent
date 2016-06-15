@@ -34,6 +34,7 @@ class CoreWebComponent extends HTMLElement {
   _linkTemplate() {
     const shadowRoot = this.createShadowRoot(),
           template = document.importNode(this.constructor.template, true);
+    this.root = this._shadowRoot || this.shadowRoot;
     shadowRoot.appendChild(template);
   }
   createdCallback() {
