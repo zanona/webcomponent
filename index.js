@@ -1,3 +1,15 @@
+function extendComponent(exported) {
+  //CREATE NEW ELEMENT BASED ON TAG
+  //LOOK FOR OWN PROPERTIES
+  //ADD BASE PROPERTIES TO EXPORTED MODUE
+  const base = Object.getPrototypeOf(document.createElement(exported.extends)),
+        properties = Object.getOwnPropertyNames(base);
+  for (const key of properties) {
+    const descriptor = Object.getOwnPropertyDescriptor(base, key);
+    Object.defineProperty(exported.prototype, key, descriptor);
+  }
+}
+
 function importComponent(name) {
   document.imported = document.imported || {};
   if (document.imported[name]) { return; }
@@ -13,6 +25,7 @@ function importComponent(name) {
           exported = doc.exports;
     if (template && exported) { exported.attachTemplate(template); }
     document.imported[name] = exported;
+    if (exported.extends) { extendComponent(exported); }
     document.registerElement(name, exported);
   });
   return this;
