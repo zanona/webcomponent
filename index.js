@@ -122,7 +122,10 @@ class WebComponent extends CoreWebComponent {
 
     if (node.nodeType === Node.ATTRIBUTE_NODE && node._ownerElement instanceof WebComponent) {
       //console.log('ASSIGNING', node.nodeName, '=' , node.textContent);
-      node._ownerElement.set(node.nodeName, node.textContent);
+      // DO NOT SET BINDING STRINGS
+      if (!node.textContent.match(/^[\{\[]{2}/)) {
+        node._ownerElement.set(node.nodeName, node.textContent);
+      }
     }
   }
   _dig(node) {
@@ -163,11 +166,16 @@ class WebComponent extends CoreWebComponent {
   _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
+        // TODO: COMPRESS FUNCTION / LESS NESTED
         if (this.called) {
           delete this.called;
         } else {
           listener.related.called = true;
-          listener.related.set(listener.key, this[key]);
+          // ONLY SET DEFINED VALUES;
+          /*eslint max-depth: [1,4]*/
+          if (typeof this[key] !== 'undefined') {
+            listener.related.set(listener.key, this[key]);
+          }
         }
       }
       //UPDATE ATTRIBUTES
@@ -175,9 +183,12 @@ class WebComponent extends CoreWebComponent {
       this._searchBindings(content).forEach((b) => {
         content = content.replace(b.raw, (m) => {
           // REPLACE OBJECT PATH NOTATION (i.e: obj.name)
-          if (b.key.match('.')) {
+          if (b.key.match(/\./)) {
             let base = listener.host;
-            for (const p of b.key.split('.')) { base = base[p]; }
+            for (const p of b.key.split('.')) {
+              base = base[p];
+              if (typeof base === 'undefined') { break; }
+            }
             return base || m;
           }
           return listener.host[b.key] || m;
