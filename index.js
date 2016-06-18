@@ -47,7 +47,9 @@ class CoreWebComponent extends HTMLElement {
   _linkTemplate() {
     const shadowRoot = this.createShadowRoot(),
           template = document.importNode(this.constructor.template, true);
-    this.root = this._shadowRoot || this.shadowRoot;
+    Object.defineProperty(this, 'root', {
+      get() { return (this._shadowRoot || this.shadowRoot); }
+    });
     shadowRoot.appendChild(template);
   }
   createdCallback() {
@@ -154,31 +156,40 @@ class WebComponent extends CoreWebComponent {
     if (this.shadowRoot) { this._dig(this.shadowRoot); }
 
     //APPLY INITIAL VALUES
-    for (const p in this) {
-      if (this.hasOwnProperty(p)) { this.set(p, this[p]); }
+    for (const key in this._bindings) {
+      this._updateListenerValues(key, this._bindings[key]);
     }
   }
-  set(key, value) {
-    this[key] = value;
-    const keyListeners = this._bindings[key] || [];
+  _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
         if (this.called) {
           delete this.called;
         } else {
           listener.related.called = true;
-          listener.related.set(listener.key, value);
+          listener.related.set(listener.key, this[key]);
         }
       }
       //UPDATE ATTRIBUTES
       let content = listener.originalValue;
       this._searchBindings(content).forEach((b) => {
         content = content.replace(b.raw, (m) => {
+          // REPLACE OBJECT PATH NOTATION (i.e: obj.name)
+          if (b.key.match('.')) {
+            let base = listener.host;
+            for (const p of b.key.split('.')) { base = base[p]; }
+            return base || m;
+          }
           return listener.host[b.key] || m;
         });
       });
       listener.node.textContent = content;
     }
+  }
+  set(key, value) {
+    this[key] = value;
+    const keyListeners = this._bindings[key];
+    if (keyListeners) { this._updateListenerValues(key, keyListeners); }
   }
 }
 
