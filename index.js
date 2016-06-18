@@ -197,10 +197,25 @@ class WebComponent extends CoreWebComponent {
       listener.node.textContent = content;
     }
   }
+  _refreshDependentListeners(objName) {
+    Object.keys(this._bindings).forEach((b) => {
+      const belongsToObject = new RegExp('^' + objName + '\\.').test(b);
+      if (belongsToObject) {
+        this._updateListenerValues(b, this._bindings[b]);
+      }
+    });
+  }
   set(key, value) {
     this[key] = value;
     const keyListeners = this._bindings[key];
     if (keyListeners) { this._updateListenerValues(key, keyListeners); }
+
+    // IF VALUE IS OBJECT, LOOK FOR BINDINGS
+    // USING PATHS OF THAT OBJECT (I.E: USER.NAME)
+    // AND AUTO-REFRESH THEIR LISTENER VALUES
+    if (value.constructor.name === 'Object') {
+      this._refreshDependentListeners(key);
+    }
   }
 }
 
