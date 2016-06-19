@@ -81,13 +81,23 @@ class WebComponent extends CoreWebComponent {
     });
     return bindings;
   }
+  _searchForHostComponent(node) {
+    while (node.parentNode) { node = node.parentNode; }
+    return node.host;
+  }
   _bind(node, binding) {
     let from, fromKey, to, toKey;
 
+    // IF BINDING IS FOUND ON OWN COMPONENT TAG
+    // <x-component attr=[[binding]]></x-component>
+    // ALWAYS HAPPENS ON ATTRIBUTE_NODE
     if (node._ownerElement === this) {
       from     = node._ownerElement;
       fromKey  = node.nodeName;
-      to       = node._ownerInstance.parentNode.host;
+      // SOMETIMES COMPONENTS GET ADDED IN DIFFERENT ORDER
+      // INSTEAD OF RELYING ON NODE._OWNERINSTANCE WE
+      // NEED TO SEARCH THE DOM TREE UPWARDS
+      to       = this._searchForHostComponent(from);
       toKey    = binding.key;
     } else {
       from     = node._ownerInstance;
