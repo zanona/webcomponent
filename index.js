@@ -175,16 +175,31 @@ class WebComponent extends CoreWebComponent {
   }
   _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
+      const related = listener.related;
       if (listener.related instanceof WebComponent) {
         // TODO: COMPRESS FUNCTION / LESS NESTED
+        // TODO: REFACTOR CALLED LOGIC
         if (this.called) {
           delete this.called;
+          delete related.called;
+          this.connection += 1;
+          //console.log('ALREADY CALLED', listener.key, key);
+          if (this.connection >= 3) {
+            this.connection = 0;
+            //console.log('CALLING AGAIN', this.connection, this.conn);
+            const value = this.getObj(this, key);
+            if (typeof value !== 'undefined') {
+              related.set(listener.key, value);
+            }
+          }
         } else {
-          listener.related.called = true;
+          related.called = true;
+          this.connection = 1;
           // ONLY SET DEFINED VALUES;
           /*eslint max-depth: [1,4]*/
-          if (typeof this[key] !== 'undefined') {
-            listener.related.set(listener.key, this[key]);
+          const value = this.getObj(this, key);
+          if (typeof value !== 'undefined') {
+            related.set(listener.key, value);
           }
         }
       }
@@ -192,16 +207,7 @@ class WebComponent extends CoreWebComponent {
       let content = listener.originalValue;
       this._searchBindings(content).forEach((b) => {
         content = content.replace(b.raw, (m) => {
-          // REPLACE OBJECT PATH NOTATION (i.e: obj.name)
-          if (b.key.match(/\./)) {
-            let base = listener.host;
-            for (const p of b.key.split('.')) {
-              base = base[p];
-              if (typeof base === 'undefined') { break; }
-            }
-            return base || m;
-          }
-          return listener.host[b.key] || m;
+          return this.getObj(listener.host, b.key) || m;
         });
       });
       listener.node.textContent = content;
@@ -215,8 +221,36 @@ class WebComponent extends CoreWebComponent {
       }
     });
   }
+  getObj(base, path) {
+    if (path.match(/\./)) {
+      for (const key of path.split('.')) {
+        base = base[key];
+        if (typeof base === 'undefined') { break; }
+      }
+      return base;
+    }
+    return base[path];
+  }
+  setObj(path, value) {
+    if (path.match(/\./)) {
+      const keys = path.split('.');
+      let base = this[keys.shift()],
+          key;
+      while ((key = keys.shift())) {
+        if (keys.length) {
+          // IF OBJ.NAME.FIRST DOESN'T EXIST, CREATE OBJ.NAME FIRST
+          base[key] = base[key] || {};
+          base = base[key];
+        }
+        if (!keys.length) {
+          base[key] = value;
+        }
+      }
+    }
+    return this[path] = value;
+  }
   set(key, value) {
-    this[key] = value;
+    this.setObj(key, value);
     const keyListeners = this._bindings[key];
     if (keyListeners) { this._updateListenerValues(key, keyListeners); }
 
