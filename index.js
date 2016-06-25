@@ -155,6 +155,24 @@ class WebComponent extends CoreWebComponent {
       originalValue: node.textContent
     });
   }
+  _bindRelated(node, key) {
+    const related = node._ownerInstance;
+    WebComponent.searchBindings(key).forEach((b) => {
+      let binds = related._bindings[b.key] || [];
+      binds = binds.filter((i) => i.node === node );
+      if (!binds.length) {
+        const propertyBindings = related._bindings[b.key] = related._bindings[b.key] || [];
+        propertyBindings.push({
+          raw: b.raw,
+          key: node.nodeName,
+          host: related,
+          related: node._ownerElement,
+          node: node,
+          originalValue: node.textContent
+        });
+      }
+    });
+  }
   _registerProperties(node) {
     const bindings    = WebComponent.searchBindings(node.textContent),
           isComponent = node._ownerElement instanceof WebComponent,
@@ -163,7 +181,14 @@ class WebComponent extends CoreWebComponent {
     for (const binding of bindings) { this._bind(node, binding); }
 
     if (isComponent && isAttribute) {
-      this._preSet(node._ownerElement, node.nodeName, node.textContent);
+      this._bindRelated(node, node.textContent);
+      this._preSet(
+        node._ownerElement,
+        node.nodeName,
+        null,
+        null,
+        node.textContent
+      );
     }
   }
   _dig(node) {
@@ -200,13 +225,18 @@ class WebComponent extends CoreWebComponent {
       this._updateListenerValues(key, this._bindings[key]);
     }
   }
-  _preSet(related, relatedKey, value) {
-    const rValue          = WebComponent.getObj(related, relatedKey),
-          valueExists     = typeof value  !== 'undefined',
-          valuesDiffer    = value !== rValue,
-          isValueTemplate = WebComponent.searchBindings(value).length;
+  _preSet(related, relatedKey, original, originalKey, originalValue) {
+    const rValue           = WebComponent.getObj(related, relatedKey),
+          rValueExists     = typeof rValue !== 'undefined',
+          value            = originalValue || WebComponent.getObj(original, originalKey),
+          valueExists      = typeof value  !== 'undefined',
+          valuesDiffer     = value !== rValue,
+          isRValueTemplate = WebComponent.searchBindings(rValue).length,
+          isValueTemplate  = WebComponent.searchBindings(value).length;
     if (valueExists && valuesDiffer && !isValueTemplate) {
       related.set(relatedKey, value);
+    } else if (original && rValueExists && valuesDiffer && !isRValueTemplate) {
+      original.set(originalKey, rValue);
     }
   }
   _updateListenerAttributeValue(listener) {
@@ -221,7 +251,12 @@ class WebComponent extends CoreWebComponent {
   _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
-        this._preSet(listener.related, listener.key, WebComponent.getObj(this, key));
+        this._preSet(
+          listener.related,
+          listener.key,
+          this,
+          key
+        );
       }
       this._updateListenerAttributeValue(listener);
     }
