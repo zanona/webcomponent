@@ -82,8 +82,8 @@ class WebComponent extends CoreWebComponent {
   static setObj(base, path, value) {
     if (path.match(/\./)) {
       const keys = path.split('.');
-      base = base[keys.shift()];
-      let key;
+      let key = keys.shift();
+      base = base[key] = base[key] || {};
       while ((key = keys.shift())) {
         if (keys.length) {
           // IF OBJ.NAME.FIRST DOESN'T EXIST, CREATE OBJ.NAME FIRST
@@ -145,7 +145,11 @@ class WebComponent extends CoreWebComponent {
     );
     */
 
-    const propertyBindings = from._bindings[fromKey] = from._bindings[fromKey] || [];
+    const propertyBindings = from._bindings[fromKey] = from._bindings[fromKey] || [],
+          binds = propertyBindings.filter((i) => i.node === node );
+    //PREVENT ADDING REPEATED BINDINGS
+    if (binds.length) { return; }
+
     propertyBindings.push({
       raw: binding.raw,
       key: toKey,
@@ -156,21 +160,22 @@ class WebComponent extends CoreWebComponent {
     });
   }
   _bindRelated(node, key) {
+    //TODO unify with _bind
     const related = node._ownerInstance;
     WebComponent.searchBindings(key).forEach((b) => {
-      let binds = related._bindings[b.key] || [];
-      binds = binds.filter((i) => i.node === node );
-      if (!binds.length) {
-        const propertyBindings = related._bindings[b.key] = related._bindings[b.key] || [];
-        propertyBindings.push({
-          raw: b.raw,
-          key: node.nodeName,
-          host: related,
-          related: node._ownerElement,
-          node: node,
-          originalValue: node.textContent
-        });
-      }
+      const propertyBindings = related._bindings[b.key] = related._bindings[b.key] || [],
+            binds = propertyBindings.filter((i) => i.node === node );
+      //PREVENT ADDING REPEATED BINDINGS
+      if (!binds.length) { return; }
+
+      propertyBindings.push({
+        raw: b.raw,
+        key: node.nodeName,
+        host: related,
+        related: node._ownerElement,
+        node: node,
+        originalValue: node.textContent
+      });
     });
   }
   _registerProperties(node) {
