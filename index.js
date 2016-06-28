@@ -1,41 +1,38 @@
-function extendComponent(exported) {
-  //CREATE NEW ELEMENT BASED ON TAG
-  //LOOK FOR OWN PROPERTIES
-  //ADD BASE PROPERTIES TO EXPORTED MODUE
-  const base = Object.getPrototypeOf(document.createElement(exported.extends)),
-        properties = Object.getOwnPropertyNames(base);
-  for (const key of properties) {
-    const descriptor = Object.getOwnPropertyDescriptor(base, key);
-    Object.defineProperty(exported.prototype, key, descriptor);
-  }
-}
-
-function importComponent(name) {
-  document.imported = document.imported || {};
-  if (document.imported[name]) { return; }
-  document.imported[name] = 'pending';
-  var link = document.createElement('link');
-  link.rel = 'import';
-  link.async = true;
-  link.href = name + '.html';
-  document.head.appendChild(link);
-  link.addEventListener('load', () => {
-    const doc      = link.import,
-          template = doc.querySelector('template'),
-          exported = doc.exports;
-    if (template && exported) { exported.attachTemplate(template); }
-    document.imported[name] = exported;
-    if (exported.extends) { extendComponent(exported); }
-    document.registerElement(name, exported);
-  });
-  return this;
-}
-
-Object.defineProperty(window, 'module', {
+Object.defineProperty(self, 'module', {
   get() {
     const script = document._currentScript || document.currentScript,
           doc = script ? script.ownerDocument : document;
-    doc.import = importComponent;
+    function extendComponent(exported) {
+      //CREATE NEW ELEMENT BASED ON TAG
+      //LOOK FOR OWN PROPERTIES
+      //ADD BASE PROPERTIES TO EXPORTED MODUE
+      const base = Object.getPrototypeOf(document.createElement(exported.extends)),
+            properties = Object.getOwnPropertyNames(base);
+      for (const key of properties) {
+        const descriptor = Object.getOwnPropertyDescriptor(base, key);
+        Object.defineProperty(exported.prototype, key, descriptor);
+      }
+    }
+    doc.import = function (name) {
+      document.imported = document.imported || {};
+      if (document.imported[name]) { return; }
+      document.imported[name] = 'pending';
+      var link = document.createElement('link');
+      link.rel = 'import';
+      link.async = true;
+      link.href = name + '.html';
+      document.head.appendChild(link);
+      link.addEventListener('load', () => {
+        const ownerDoc = link.import,
+              template = ownerDoc.querySelector('template'),
+              exported = ownerDoc.exports;
+        if (template && exported) { exported.attachTemplate(template); }
+        document.imported[name] = exported;
+        if (exported.extends) { extendComponent(exported); }
+        document.registerElement(name, exported);
+      });
+      return this;
+    };
     return doc;
   }
 });
@@ -288,4 +285,4 @@ class WebComponent extends CoreWebComponent {
   }
 }
 
-window.WebComponent = WebComponent;
+self.WebComponent = WebComponent;
