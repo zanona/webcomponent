@@ -60,8 +60,8 @@ class CoreWebComponent extends HTMLElement {
     if (this.created) this.created();
   }
   attachedCallback() {
-    this._analyse();
     if (this.attached) this.attached();
+    this._analyse();
   }
 }
 class WebComponent extends CoreWebComponent {
