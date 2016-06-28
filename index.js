@@ -64,7 +64,6 @@ class CoreWebComponent extends HTMLElement {
     if (this.attached) this.attached();
   }
 }
-
 class WebComponent extends CoreWebComponent {
   static getObj(base, path) {
     if (path.match(/\./)) {
@@ -245,7 +244,10 @@ class WebComponent extends CoreWebComponent {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (m) => {
-        return WebComponent.getObj(listener.host, b.key) || m;
+        const value = WebComponent.getObj(listener.host, b.key);
+        //SKIP OBJECTS AND ARRAY VALUES FOR ATTRIBUTE VALUES
+        if (typeof value === 'object' || !value) { return m; }
+        return value;
       });
     });
     listener.node.textContent = content;
