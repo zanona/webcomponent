@@ -98,13 +98,13 @@ class WebComponent extends CoreWebComponent {
     return base[path] = value;
   }
   static searchBindings(text) {
-    const tag = /([\[\{]){2}([a-z-0-9-\.\_$]+)[\]\}]{2}/gi,
+    const tag = /\[{2}([a-z-0-9-\.\_$\[\]]+)\]{2}|\{{2}([a-z-0-9-\.\_$\[\]]+)\}{2}/gi,
           bindings = [];
     if (text && text.replace) {
-      text.replace(tag, (raw, type, key) => {
+      text.replace(tag, (raw, oneWayKey, twoWayKey) => {
         bindings.push({
-          auto: type === '{',
-          key,
+          auto: !!twoWayKey,
+          key: oneWayKey || twoWayKey,
           raw
         });
       });
