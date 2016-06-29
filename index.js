@@ -162,7 +162,7 @@ class WebComponent extends CoreWebComponent {
       const propertyBindings = related._bindings[b.key] = related._bindings[b.key] || [],
             binds = propertyBindings.filter((i) => i.node === node );
       //PREVENT ADDING REPEATED BINDINGS
-      if (!binds.length) { return; }
+      if (binds.length) { return; }
 
       propertyBindings.push({
         raw: b.raw,
