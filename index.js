@@ -63,6 +63,22 @@ class CoreWebComponent extends HTMLElement {
     if (this.attached) this.attached();
     this._analyse();
   }
+  detachedCallback() {
+    //REMOVE BINDINGS RELATED TO ELEMENT ONCE DETACHED
+    const bindingKeys = this._ownerInstance._bindings;
+    for (const key in bindingKeys) {
+      const bindings = bindingKeys[key];
+      for (const binding of bindings) {
+        if (binding.related === this) {
+          const index = bindings.indexOf(binding);
+          bindings.splice(index, 1);
+        }
+      }
+      //IF NO MORE BINDINGS, REMOVE KEY
+      if (!bindings.length) { delete bindingKeys[key]; }
+    }
+    if (this.detached) this.detached();
+  }
 }
 class WebComponent extends CoreWebComponent {
   static getObj(base, path) {
