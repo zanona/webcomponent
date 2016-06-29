@@ -245,9 +245,11 @@ class WebComponent extends CoreWebComponent {
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (m) => {
         const value = WebComponent.getObj(listener.host, b.key);
-        //SKIP OBJECTS AND ARRAY VALUES FOR ATTRIBUTE VALUES
-        if (typeof value === 'object' || !value) { return m; }
-        return value;
+        //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
+        if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
+          if (typeof value === 'object' || !value) { return m; }
+        }
+        return value || m;
       });
     });
     listener.node.textContent = content;
