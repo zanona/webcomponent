@@ -284,6 +284,11 @@ class WebComponent extends CoreWebComponent {
     }
   }
   _refreshDependentListeners(objName) {
+    //EXPAND BEFORE CONVERTING TO REGEXP
+    objName = objName
+      .replace(/\$/g, '\\$')
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]');
     Object.keys(this._bindings).forEach((b) => {
       const belongsToObject = new RegExp('^' + objName + '\\.').test(b);
       if (belongsToObject) {
