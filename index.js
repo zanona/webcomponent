@@ -304,7 +304,9 @@ class WebComponent extends CoreWebComponent {
     // IF VALUE IS OBJECT, LOOK FOR BINDINGS
     // USING PATHS OF THAT OBJECT (I.E: USER.NAME)
     // AND AUTO-REFRESH THEIR LISTENER VALUES
-    if (value.constructor.name === 'Object') {
+    if (value !== null &&
+        typeof value !== 'undefined' &&
+        value.constructor.name === 'Object') {
       this._refreshDependentListeners(key);
     }
   }
