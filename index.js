@@ -81,35 +81,23 @@ class CoreWebComponent extends HTMLElement {
   }
 }
 class WebComponent extends CoreWebComponent {
-  static getObj(base, path) {
-    if (!path) { return; }
-    if (path.match(/\./)) {
-      const keys = path.split(/[\.\[\]]/).filter((i) => i);
-      for (const key of keys) {
-        base = base[key];
-        if (typeof base === 'undefined') { break; }
-      }
-      return base;
-    }
-    return base[path];
-  }
-  static setObj(base, path, value) {
-    if (path.match(/\./)) {
-      const keys = path.split(/[\.\[\]]/).filter((i) => i);
-      let key,
-          rBase = base || {};
-      while ((key = keys.shift())) {
-        if (keys.length) {
-          //CHECK AHEAD FOR NUMBER KEY - ARRAY TYPE
+  static obj(base, path, value) {
+    const noValue = typeof value === 'undefined',
+          keys = path.split(/[\.\[\]]/).filter((i) => i);
+    let key,
+        rBase = base || {};
+    while ((key = keys.shift())) {
+      if (keys.length) {
+        if (noValue) {
+          rBase = rBase[key] ? rBase[key] : rBase;
+        } else {
           const isArray = !isNaN([keys[0]]);
           rBase[key] = rBase[key] || (isArray ? [] : {});
           rBase = rBase[key];
-        } else {
-          rBase[key] = value;
         }
+      } else {
+        return noValue ? rBase[key] : (rBase[key] = value);
       }
-    } else {
-      base[path] = value;
     }
   }
   static searchBindings(text) {
@@ -255,9 +243,9 @@ class WebComponent extends CoreWebComponent {
     }
   }
   _preSet(related, relatedKey, original, originalKey, originalValue) {
-    const rValue           = WebComponent.getObj(related, relatedKey),
+    const rValue           = WebComponent.obj(related, relatedKey),
           rValueExists     = typeof rValue !== 'undefined',
-          value            = originalValue || WebComponent.getObj(original, originalKey),
+          value            = originalValue || WebComponent.obj(original, originalKey),
           valueExists      = typeof value  !== 'undefined',
           valuesDiffer     = value !== rValue,
           isRValueTemplate = WebComponent.searchBindings(rValue).length,
@@ -272,7 +260,7 @@ class WebComponent extends CoreWebComponent {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (_m) => {
-        const value = WebComponent.getObj(listener.host, b.key);
+        const value = WebComponent.obj(listener.host, b.key);
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
           if (typeof value === 'object') { return ''; }
@@ -304,7 +292,7 @@ class WebComponent extends CoreWebComponent {
     });
   }
   set(key, value) {
-    WebComponent.setObj(this, key, value);
+    WebComponent.obj(this, key, value);
     const keyListeners = this._bindings[key];
     if (keyListeners) { this._updateListenerValues(key, keyListeners); }
 
