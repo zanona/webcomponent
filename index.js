@@ -84,7 +84,8 @@ class WebComponent extends CoreWebComponent {
   static getObj(base, path) {
     if (!path) { return; }
     if (path.match(/\./)) {
-      for (const key of path.split('.')) {
+      const keys = path.split(/[\.\[\]]/).filter((i) => i);
+      for (const key of keys) {
         base = base[key];
         if (typeof base === 'undefined') { break; }
       }
@@ -94,21 +95,22 @@ class WebComponent extends CoreWebComponent {
   }
   static setObj(base, path, value) {
     if (path.match(/\./)) {
-      const keys = path.split('.');
-      let key = keys.shift();
-      base = base[key] = base[key] || {};
+      const keys = path.split(/[\.\[\]]/).filter((i) => i);
+      let key,
+          rBase = base || {};
       while ((key = keys.shift())) {
         if (keys.length) {
-          // IF OBJ.NAME.FIRST DOESN'T EXIST, CREATE OBJ.NAME FIRST
-          base[key] = base[key] || {};
-          base = base[key];
-        }
-        if (!keys.length) {
-          base[key] = value;
+          //CHECK AHEAD FOR NUMBER KEY - ARRAY TYPE
+          const isArray = !isNaN([keys[0]]);
+          rBase[key] = rBase[key] || (isArray ? [] : {});
+          rBase = rBase[key];
+        } else {
+          rBase[key] = value;
         }
       }
+    } else {
+      base[path] = value;
     }
-    return base[path] = value;
   }
   static searchBindings(text) {
     const tag = /\[{2}([a-z-0-9-\.\_$\[\]]+)\]{2}|\{{2}([a-z-0-9-\.\_$\[\]]+)\}{2}/gi,
