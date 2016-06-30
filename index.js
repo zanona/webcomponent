@@ -82,6 +82,7 @@ class CoreWebComponent extends HTMLElement {
 }
 class WebComponent extends CoreWebComponent {
   static getObj(base, path) {
+    if (!path) { return; }
     if (path.match(/\./)) {
       for (const key of path.split('.')) {
         base = base[key];
@@ -124,6 +125,7 @@ class WebComponent extends CoreWebComponent {
     return bindings;
   }
   static searchForHostComponent(node) {
+    if (node.nodeType === Node.ATTRIBUTE_NODE) { node = node._ownerElement; }
     const parent = node.parentNode;
     if (!parent) { return node.host; }
     if (parent instanceof WebComponent) { return parent; }
@@ -168,62 +170,70 @@ class WebComponent extends CoreWebComponent {
       host: from,
       related: to,
       node: node,
-      originalValue: node.textContent
+      originalValue: node._originalContent
     });
   }
-  _bindRelated(node, key) {
-    //TODO unify with _bind
-    const related = node._ownerInstance;
-    WebComponent.searchBindings(key).forEach((b) => {
-      const propertyBindings = related._bindings[b.key] = related._bindings[b.key] || [],
-            binds = propertyBindings.filter((i) => i.node === node );
-      //PREVENT ADDING REPEATED BINDINGS
-      if (binds.length) { return; }
+  _bindRelated(node, binding) {
+    const related = node._ownerInstance,
+          propertyBindings = related._bindings[binding.key] = related._bindings[binding.key] || [],
+          binds = propertyBindings.filter((i) => i.node === node );
+    //PREVENT ADDING REPEATED BINDINGS
+    if (binds.length) { return; }
 
-      propertyBindings.push({
-        raw: b.raw,
-        key: node.nodeName,
-        host: related,
-        related: node._ownerElement,
-        node: node,
-        originalValue: node.textContent
-      });
+    propertyBindings.push({
+      raw: binding.raw,
+      key: node.nodeName,
+      host: related,
+      related: node._ownerElement,
+      node: node,
+      originalValue: node._originalContent
     });
   }
   _registerProperties(node) {
-    const bindings    = WebComponent.searchBindings(node.textContent),
+    const bindings    = WebComponent.searchBindings(node._originalContent),
           isComponent = node._ownerElement instanceof WebComponent,
           isAttribute = node.nodeType === Node.ATTRIBUTE_NODE;
 
-    for (const binding of bindings) { this._bind(node, binding); }
+    for (const binding of bindings) {
+      //BINDS ONLY ON COMPONENT
+      this._bind(node, binding);
+      //TWO-WAY BINDING ON COMPONENT OWNER
+      if (isComponent && isAttribute) { this._bindRelated(node, binding); }
+    }
 
     if (isComponent && isAttribute) {
-      this._bindRelated(node, node.textContent);
       this._preSet(
         node._ownerElement,
         node.nodeName,
         null,
         null,
-        node.textContent
+        node._originalContent
       );
     }
   }
   _dig(node) {
     const INSTANCE = '_ownerInstance',
-          ELEMENT  = '_ownerElement';
+          ELEMENT  = '_ownerElement',
+          ORIGINAL = '_originalContent';
     if (!node.hasOwnProperty(INSTANCE)) {
       Object.defineProperty(node, INSTANCE, {
         value: WebComponent.searchForHostComponent(node)
       });
     }
+    // STORE ORIGINAL CONTENT SO BINDING TEMPLATES CAN BE REMOVED
+    if (!node.hasOwnProperty(ORIGINAL)) {
+      Object.defineProperty(node, ORIGINAL, { value: node.textContent });
+    }
     if (node.attributes) {
       for (const attr of Array.from(node.attributes)) {
-        if (!attr.hasOwnProperty(INSTANCE)) {
+        if (!attr.hasOwnProperty(ELEMENT)) {
           Object.defineProperty(attr, ELEMENT,  { value: node });
-          Object.defineProperty(attr, INSTANCE, { value: node[INSTANCE] });
         }
-        this._registerProperties(attr);
+        this._dig(attr);
       }
+    }
+    if (node.nodeType === Node.ATTRIBUTE_NODE) {
+      this._registerProperties(node);
     }
     if (node.nodeType === Node.TEXT_NODE) {
       Object.defineProperty(node, ELEMENT, {value: node.parentNode});
@@ -256,16 +266,16 @@ class WebComponent extends CoreWebComponent {
       original.set(originalKey, rValue);
     }
   }
-  _updateListenerAttributeValue(listener) {
+  _updateListenerNodeValue(listener) {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
-      content = content.replace(b.raw, (m) => {
+      content = content.replace(b.raw, (_m) => {
         const value = WebComponent.getObj(listener.host, b.key);
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
-          if (typeof value === 'object' || !value) { return m; }
+          if (typeof value === 'object') { return ''; }
         }
-        return value || m;
+        return value || '';
       });
     });
     listener.node.textContent = content;
@@ -280,7 +290,7 @@ class WebComponent extends CoreWebComponent {
           key
         );
       }
-      this._updateListenerAttributeValue(listener);
+      this._updateListenerNodeValue(listener);
     }
   }
   _refreshDependentListeners(objName) {
