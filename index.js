@@ -10,7 +10,10 @@ Object.defineProperty(self, 'module', {
       //ADD BASE PROPERTIES TO EXPORTED MODUE
       const base = Object.getPrototypeOf(document.createElement(exported.extends)),
             properties = Object.getOwnPropertyNames(base);
+
       for (const key of properties) {
+        // DO NOT OVERWRITE CONSTRUCTOR
+        if (key === 'constructor') return;
         const descriptor = Object.getOwnPropertyDescriptor(base, key);
         Object.defineProperty(exported.prototype, key, descriptor);
       }
@@ -79,7 +82,8 @@ class CoreWebComponent extends HTMLElement {
     // RELYING ON DOCUMENT.IMPORTED SINCE THE POLYFILL MESSES UP WITH
     // CONSTRUCTOR OBJECTS
     if (!this.constructor.name) {
-      this.constructor = document.imported[this.nodeName.toLowerCase()];
+      const name = this.getAttribute('is') || this.nodeName.toLowerCase();
+      this.constructor = document.imported[name];
     }
     if (this.constructor.template) { this._linkTemplate(); }
     if (this.created) this.created();
