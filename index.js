@@ -1,7 +1,9 @@
 Object.defineProperty(self, 'module', {
   get() {
-    const script = document._currentScript || document.currentScript,
-          doc = script ? script.ownerDocument : document;
+    const BASE_LOADING = true,
+          script = document._currentScript || document.currentScript,
+          doc    = script ? script.ownerDocument : document;
+
     function extendComponent(exported) {
       //CREATE NEW ELEMENT BASED ON TAG
       //LOOK FOR OWN PROPERTIES
@@ -13,26 +15,49 @@ Object.defineProperty(self, 'module', {
         Object.defineProperty(exported.prototype, key, descriptor);
       }
     }
-    doc.import = function (name) {
-      document.imported = document.imported || {};
-      if (document.imported[name]) { return; }
-      document.imported[name] = 'pending';
-      var link = document.createElement('link');
-      link.rel = 'import';
+    function onLinkLoad(e) {
+      const ownerDoc = e.target.import,
+            template = ownerDoc.querySelector('template'),
+            exported = ownerDoc.exports,
+            tagName  = e.target.getAttribute('tag-name');
+
+      if (template && exported) { exported.attachTemplate(template); }
+      if (exported.extends) { extendComponent(exported); }
+      document.imported[tagName] = exported;
+      document.registerElement(tagName, exported);
+    }
+    function addLink(href, tagName) {
+      const link = document.createElement('link');
+      link.rel   = 'import';
       link.async = true;
-      link.href = name + '.html';
-      document.head.appendChild(link);
-      link.addEventListener('load', () => {
-        const ownerDoc = link.import,
-              template = ownerDoc.querySelector('template'),
-              exported = ownerDoc.exports;
-        if (template && exported) { exported.attachTemplate(template); }
-        document.imported[name] = exported;
-        if (exported.extends) { extendComponent(exported); }
-        document.registerElement(name, exported);
-      });
+      link.href  = href + '.html';
+      link.setAttribute('tag-name', tagName);
+      link.addEventListener('load', onLinkLoad);
+      this.head.appendChild(link);
+    }
+    function getDocPath(href) {
+      const docURL = this.documentURI.split(/[?#]/)[0];
+      let path = docURL.replace(this.origin, '').split('/');
+      path.pop();
+      path = path.concat(href).join('/').replace(/\/\./g, '');
+      return path;
+    }
+    function importComponent(href, tagName) {
+      const absoluteHREF = getDocPath.bind(this)(href);
+      tagName = tagName || href.split('.html')[0].split('/').pop();
+
+      document.imported = document.imported || {};
+      if (document.imported[tagName]) { return this; }
+      document.imported[tagName] = 'pending';
+
+      addLink.bind(BASE_LOADING ? document : this)(absoluteHREF, tagName);
       return this;
-    };
+    }
+
+    if (!doc.hasOwnProperty('import')) {
+      Object.defineProperty(doc, 'import', { value: importComponent });
+    }
+
     return doc;
   }
 });
