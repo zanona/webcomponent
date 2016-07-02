@@ -111,13 +111,14 @@ class CoreWebComponent extends HTMLElement {
 }
 class WebComponent extends CoreWebComponent {
   static obj(base, path, value) {
-    const noValue = typeof value === 'undefined',
-          keys = path.split(/[\.\[\]]/).filter((i) => i);
+    const getter  = typeof value === 'undefined',
+          nullify = (value === null),
+          keys    = path.split(/[\.\[\]]/).filter((i) => i);
     let key,
         rBase = base || {};
     while ((key = keys.shift())) {
       if (keys.length) {
-        if (noValue) {
+        if (getter || nullify) {
           rBase = rBase[key] ? rBase[key] : rBase;
         } else {
           const isArray = !isNaN([keys[0]]);
@@ -125,7 +126,13 @@ class WebComponent extends CoreWebComponent {
           rBase = rBase[key];
         }
       } else {
-        return noValue ? rBase[key] : (rBase[key] = value);
+        if (getter) {
+          return rBase[key];
+        } else if (nullify) {
+          delete rBase[key];
+        } else {
+          return rBase[key] = value;
+        }
       }
     }
   }
