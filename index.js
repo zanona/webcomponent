@@ -1,6 +1,6 @@
 Object.defineProperty(self, 'module', {
   get() {
-    const BASE_LOADING = true,
+    const BASE_LOADING = false,
           script = document._currentScript || document.currentScript,
           doc    = script ? script.ownerDocument : document;
 
@@ -110,29 +110,35 @@ class CoreWebComponent extends HTMLElement {
   }
 }
 class WebComponent extends CoreWebComponent {
-  static obj(base, path, value) {
-    const getter  = typeof value === 'undefined',
-          nullify = (value === null),
-          keys    = path.split(/[\.\[\]]/).filter((i) => i);
+  static getObj(base, path) {
+    const keys    = path.split(/[\.\[\]]/).filter((i) => i);
     let key,
         rBase = base || {};
     while ((key = keys.shift())) {
       if (keys.length) {
-        if (getter || nullify) {
-          rBase = rBase[key] ? rBase[key] : rBase;
-        } else {
-          const isArray = !isNaN([keys[0]]);
-          rBase[key] = rBase[key] || (isArray ? [] : {});
-          rBase = rBase[key];
-        }
+        rBase = rBase[key] ? rBase[key] : rBase;
       } else {
-        if (getter) {
-          return rBase[key];
-        } else if (nullify) {
-          delete rBase[key];
-        } else {
-          return rBase[key] = value;
-        }
+        return rBase[key];
+      }
+    }
+  }
+  static setObj(base, path, value) {
+    const keys  = path.split(/[\.\[\]]/).filter((i) => i);
+          //empty = typeof value === 'undefined' || value === null;
+    let key,
+        rBase = base || {};
+    while ((key = keys.shift())) {
+      if (keys.length) {
+        //if (getter || nullify) {
+        //  rBase = rBase[key] ? rBase[key] : rBase;
+        //} else {
+        const isArray = !isNaN([keys[0]]);
+        rBase[key] = rBase[key] || (isArray ? [] : {});
+        rBase = rBase[key];
+        //}
+      } else {
+        //delete rBase[key];
+        return rBase[key] = value;
       }
     }
   }
@@ -228,13 +234,8 @@ class WebComponent extends CoreWebComponent {
     }
 
     if (isComponent && isAttribute) {
-      this._preSet(
-        node._ownerElement,
-        node.nodeName,
-        null,
-        null,
-        node._originalContent
-      );
+      const attr = node;
+      attr._ownerElement.preset(attr.name, attr._originalContent);
     }
   }
   _dig(node) {
@@ -278,25 +279,11 @@ class WebComponent extends CoreWebComponent {
       this._updateListenerValues(key, this._bindings[key]);
     }
   }
-  _preSet(related, relatedKey, original, originalKey, originalValue) {
-    const rValue           = WebComponent.obj(related, relatedKey),
-          rValueExists     = typeof rValue !== 'undefined',
-          value            = originalValue || WebComponent.obj(original, originalKey),
-          valueExists      = typeof value  !== 'undefined',
-          valuesDiffer     = value !== rValue,
-          isRValueTemplate = WebComponent.searchBindings(rValue).length,
-          isValueTemplate  = WebComponent.searchBindings(value).length;
-    if (valueExists && valuesDiffer && !isValueTemplate) {
-      related.set(relatedKey, value);
-    } else if (original && rValueExists && valuesDiffer && !isRValueTemplate) {
-      original.set(originalKey, rValue);
-    }
-  }
   _updateListenerNodeValue(listener) {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (_m) => {
-        const value = WebComponent.obj(listener.host, b.key);
+        const value = WebComponent.getObj(listener.host, b.key);
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
           if (typeof value === 'object') { return ''; }
@@ -309,12 +296,7 @@ class WebComponent extends CoreWebComponent {
   _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
-        this._preSet(
-          listener.related,
-          listener.key,
-          this,
-          key
-        );
+        listener.related.preset(listener.key, WebComponent.getObj(this, key));
       }
       this._updateListenerNodeValue(listener);
     }
@@ -326,23 +308,60 @@ class WebComponent extends CoreWebComponent {
       .replace(/\[/g, '\\[')
       .replace(/\]/g, '\\]');
     Object.keys(this._bindings).forEach((b) => {
-      const belongsToObject = new RegExp('^' + objName + '\\.').test(b);
+      const belongsToObject = new RegExp('^' + objName + '[\\.\\[]').test(b);
       if (belongsToObject) {
         this._updateListenerValues(b, this._bindings[b]);
       }
     });
   }
+  preset(key, value) {
+    //GOTTA FIND A WAY TO KNOW IF THE FIRST SETS TO UNDEFINED
+    //ARE TRIGGER PRESET, IF THEY ARE, DISCARD THOSE
+    //TEMP SOLUTION CHECK IF PREVVALUE IS UNDEFINED ON VALUEEXISTS
+    var prevValue        = WebComponent.getObj(this, key),
+        //valueExists      = typeof value  !== 'undefined',
+        valuesDiffer     = value !== prevValue,
+        isValueTemplate  = WebComponent.searchBindings(value).length;
+
+    /*
+    if (!this.attributes[key] &&
+        key.match(/[\.\[]/) &&
+        typeof value === 'undefined' &&
+        valuesDiffer) {
+      console.log('WILL NULLIFY', key, value, prevValue);
+      value = null;
+      valuesDiffer = true;
+      valueExists = true;
+    }
+    */
+
+    if (valuesDiffer && !isValueTemplate) {
+      this.set(key, value);
+    }
+    /*
+    //if (original && rValueExists && valuesDiffer && !isRValueTemplate) {
+      //SHOULD NEVER SET ORIGINAL VALUE SINCE THAT WILL BE 'VALUE'
+      //WHICH WAS JUST SET
+      //console.log('WILL SET ORIGINAL', related.nodeName, original.nodeName, originalKey, rValue);
+      //original.set(originalKey, rValue);
+    //}
+    */
+  }
   set(key, value) {
-    WebComponent.obj(this, key, value);
-    const keyListeners = this._bindings[key];
+    const prevValue = WebComponent.getObj(this, key),
+          keyListeners = this._bindings[key];
+
+    WebComponent.setObj(this, key, value);
+
     if (keyListeners) { this._updateListenerValues(key, keyListeners); }
 
     // IF VALUE IS OBJECT, LOOK FOR BINDINGS
     // USING PATHS OF THAT OBJECT (I.E: USER.NAME)
     // AND AUTO-REFRESH THEIR LISTENER VALUES
-    if (value !== null &&
-        typeof value !== 'undefined' &&
-        value.constructor.name === 'Object') {
+    value = value || prevValue;
+    if (value === null ||
+        (typeof value !== 'undefined' &&
+        value.constructor.name.match(/Array|Object/))) {
       this._refreshDependentListeners(key);
     }
   }
