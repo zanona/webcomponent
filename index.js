@@ -315,55 +315,32 @@ class WebComponent extends CoreWebComponent {
     });
   }
   preset(key, value) {
-    //GOTTA FIND A WAY TO KNOW IF THE FIRST SETS TO UNDEFINED
-    //ARE TRIGGER PRESET, IF THEY ARE, DISCARD THOSE
-    //TEMP SOLUTION CHECK IF PREVVALUE IS UNDEFINED ON VALUEEXISTS
-    var prevValue        = WebComponent.getObj(this, key),
-        //valueExists      = typeof value  !== 'undefined',
-        valuesDiffer     = value !== prevValue,
-        isValueTemplate  = WebComponent.searchBindings(value).length;
+    var prevValue       = WebComponent.getObj(this, key),
+        valuesDiffer    = prevValue !== value,
+        isValueTemplate = WebComponent.searchBindings(value).length;
 
-    /*
-    if (!this.attributes[key] &&
-        key.match(/[\.\[]/) &&
-        typeof value === 'undefined' &&
-        valuesDiffer) {
-      console.log('WILL NULLIFY', key, value, prevValue);
-      value = null;
-      valuesDiffer = true;
-      valueExists = true;
-    }
-    */
-
-    if (valuesDiffer && !isValueTemplate) {
-      this.set(key, value);
-    }
-    /*
-    //if (original && rValueExists && valuesDiffer && !isRValueTemplate) {
-      //SHOULD NEVER SET ORIGINAL VALUE SINCE THAT WILL BE 'VALUE'
-      //WHICH WAS JUST SET
-      //console.log('WILL SET ORIGINAL', related.nodeName, original.nodeName, originalKey, rValue);
-      //original.set(originalKey, rValue);
-    //}
-    */
+    if (valuesDiffer && !isValueTemplate) { this.set(key, value, true); }
   }
-  set(key, value) {
-    const prevValue = WebComponent.getObj(this, key),
-          keyListeners = this._bindings[key];
+  set(key, value, throughPreset) {
+    // IF VALUE UNDEFINED THROUGH PRESET, IGNORE IT
+    // THIS WILL PREVENT DELETING OBJ VALUES
+    // SINCE INITIAL `SET` ALREADY PROVIDED CORRECT VALUE
+    if (throughPreset && typeof value === 'undefined') { return; }
 
+    const keyListeners = this._bindings[key];
+
+    // SETTING OBJ.VALUE
+    // WILL CAUSE LISTENERS TO VALIDATED AGAINST
+    // OBJ WHICH IS UNCHANGED, NOT TRIGGERING CHANGE
     WebComponent.setObj(this, key, value);
 
+    // SHOULD PASS VALUE?
     if (keyListeners) { this._updateListenerValues(key, keyListeners); }
 
-    // IF VALUE IS OBJECT, LOOK FOR BINDINGS
-    // USING PATHS OF THAT OBJECT (I.E: USER.NAME)
-    // AND AUTO-REFRESH THEIR LISTENER VALUES
-    value = value || prevValue;
-    if (value === null ||
-        (typeof value !== 'undefined' &&
-        value.constructor.name.match(/Array|Object/))) {
-      this._refreshDependentListeners(key);
-    }
+    // LOOKUP FOR BINDINGS KEYS THAT START WITH `KEY.` or `KEY[`
+    // AND UPDATE THOSE ACCORDINGLY
+    //this._refreshDependentListeners(key.split(/\.|\[/)[0]);
+    this._refreshDependentListeners(key);
   }
 }
 
