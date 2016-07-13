@@ -283,7 +283,16 @@ class WebComponent extends CoreWebComponent {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (_m) => {
-        const value = WebComponent.getObj(listener.host, b.key);
+        let target;
+        if (listener.host._ownerInstance === listener.related) {
+          // IF THE HOST PARENT INSTANCE IS THE SAME AS RELATED
+          // IT MEANS ITS AN ATTRIBUTE REFERENCING TO THE PARENT
+          // INSTANCE INSTEAD OF THE HOST ITSELF
+          target = listener.related;
+        } else {
+          target = listener.host;
+        }
+        const value = WebComponent.getObj(target, b.key);
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
           if (typeof value === 'object') { return ''; }
@@ -296,7 +305,16 @@ class WebComponent extends CoreWebComponent {
   _updateListenerValues(key, keyListeners) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
-        listener.related.preset(listener.key, WebComponent.getObj(this, key));
+        const value = WebComponent.getObj(this, key),
+              ownProperty = listener.node.name === listener.key;
+        // DO NOT ALLOW RESETING VALUES THAT ARE NOT FROM OWN ELEMENT
+        // SUCH AS `USER.NAME`, BUT ONLY WHEN IT'S A SELF ATTRIBUTE
+        // SUCH AS `SRC`; AN ATTR NAME MATCHES THE LISTENER KEY
+        if (typeof value === 'undefined' && !ownProperty) {
+          break;
+        } else {
+          listener.related.preset(listener.key, value);
+        }
       }
       this._updateListenerNodeValue(listener);
     }
