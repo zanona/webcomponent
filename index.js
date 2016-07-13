@@ -180,6 +180,10 @@ class WebComponent extends CoreWebComponent {
       to       = node._ownerElement;
       toKey    = node.nodeName;
       binding.auto = true;
+      // IF NODE IS TEXT NODE ASSING TO KEY TO
+      // THE BINDING KEY, OTHERWISE IT WOULD ASSING
+      // TO #TEXT WHICH WOULD POINT NOWHERE AND CONFUSE THE SYSTEM
+      if (node.nodeType === Node.TEXT_NODE) { toKey = binding.key; }
     }
     /*
     console.log(node._ownerElement);
