@@ -53,6 +53,9 @@ Object.defineProperty(self, 'module', {
       if (document.imported[tagName]) { return this; }
       document.imported[tagName] = 'pending';
 
+      document.importedMap = document.importedMap || {};
+      document.importedMap[href] = tagName;
+
       addLink.bind(BASE_LOADING ? document : this)(absoluteHREF, tagName);
       return this;
     }
