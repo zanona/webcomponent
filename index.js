@@ -126,21 +126,21 @@ class WebComponent extends CoreWebComponent {
     }
   }
   static setObj(base, path, value) {
-    const keys  = path.split(/[\.\[\]]/).filter((i) => i);
-          //empty = typeof value === 'undefined' || value === null;
+    const keys  = path.split(/[\.\[\]]/).filter((i) => i),
+          empty = typeof value === 'undefined' || value === null;
     let key,
         rBase = base || {};
     while ((key = keys.shift())) {
       if (keys.length) {
-        //if (getter || nullify) {
-        //  rBase = rBase[key] ? rBase[key] : rBase;
-        //} else {
-        const isArray = !isNaN([keys[0]]);
-        rBase[key] = rBase[key] || (isArray ? [] : {});
-        rBase = rBase[key];
-        //}
+        if (empty) {
+          rBase = rBase[key] ? rBase[key] : rBase;
+        } else {
+          const isArray = !isNaN([keys[0]]);
+          rBase[key] = rBase[key] || (isArray ? [] : {});
+          rBase = rBase[key];
+        }
       } else {
-        //delete rBase[key];
+        if (empty) { return delete rBase[key]; }
         return rBase[key] = value;
       }
     }
