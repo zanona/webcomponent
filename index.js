@@ -275,10 +275,10 @@ class WebComponent extends CoreWebComponent {
     }
     Array.from(node.childNodes).forEach(this._dig.bind(this));
   }
-  _analyse() {
+  _analyse(preserveContainerState) {
     //console.log('--------', this.nodeName, '--------');
 
-    this._dig(this);
+    if (!preserveContainerState) { this._dig(this); }
     if (this.shadowRoot) { this._dig(this.shadowRoot); }
 
     //APPLY INITIAL VALUES
