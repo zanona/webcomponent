@@ -335,7 +335,15 @@ class WebComponent extends CoreWebComponent {
     Object.keys(this._bindings).forEach((b) => {
       const belongsToObject = new RegExp('^' + objName + '[\\.\\[]').test(b);
       if (belongsToObject) {
-        this._updateListenerValues(b, this._bindings[b]);
+        const keyListeners = this._bindings[b];
+        if (keyListeners) {
+          this._updateListenerValues(b, keyListeners);
+        } else {
+          // IT MAY HAPPEN THAN WHEN AN ITEM IS DELETED
+          // THE RELATED LISTENERS ARE STILL ATTACHED;
+          // IN SUCH CASES, VERIFY AND DELETE IT
+          delete this._bindings[b];
+        }
       }
     });
   }
