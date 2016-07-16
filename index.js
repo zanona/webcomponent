@@ -119,7 +119,7 @@ class WebComponent extends CoreWebComponent {
         rBase = base || {};
     while ((key = keys.shift())) {
       if (keys.length) {
-        rBase = rBase[key] ? rBase[key] : rBase;
+        rBase = rBase[key] ? rBase[key] : {};
       } else {
         return rBase[key];
       }
