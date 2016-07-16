@@ -309,18 +309,20 @@ class WebComponent extends CoreWebComponent {
     });
     listener.node.textContent = content;
   }
-  _updateListenerValues(key, keyListeners) {
+  _updateListenerValues(key, keyListeners, nullifyRelated) {
+    const value = WebComponent.getObj(this, key);
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
-        const value = WebComponent.getObj(this, key),
-              ownProperty = listener.node.name === listener.key;
+        const ownProperty = listener.node.name === listener.key,
+              relatedValue = WebComponent.getObj(listener.related, listener.key);
         // DO NOT ALLOW RESETING VALUES THAT ARE NOT FROM OWN ELEMENT
         // SUCH AS `USER.NAME`, BUT ONLY WHEN IT'S A SELF ATTRIBUTE
         // SUCH AS `SRC`; AN ATTR NAME MATCHES THE LISTENER KEY
-        if (typeof value === 'undefined' && !ownProperty) {
+        if (!nullifyRelated && typeof value === 'undefined' && !ownProperty) {
           break;
-        } else {
-          listener.related.preset(listener.key, value);
+        } else if (value !== relatedValue) {
+          // DO NOT SET IF VALUE IS SAME AS RELATED, AVOID ENDLESS LOOP
+          listener.related.preset(listener.key, nullifyRelated ? null : value);
         }
       }
       this._updateListenerNodeValue(listener);
@@ -368,7 +370,10 @@ class WebComponent extends CoreWebComponent {
     WebComponent.setObj(this, key, value);
 
     // SHOULD PASS VALUE?
-    if (keyListeners) { this._updateListenerValues(key, keyListeners); }
+    if (keyListeners) {
+      // FLAG NULL VALUE IN ORDER TO NULLIFY RELATED COMPONENTS
+      this._updateListenerValues(key, keyListeners, value === null);
+    }
 
     // LOOKUP FOR BINDINGS KEYS THAT START WITH `KEY.` or `KEY[`
     // AND UPDATE THOSE ACCORDINGLY
