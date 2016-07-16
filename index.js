@@ -42,7 +42,7 @@ Object.defineProperty(self, 'module', {
       const docURL = this.documentURI.split(/[?#]/)[0];
       let path = docURL.replace(this.origin, '').split('/');
       path.pop();
-      path = path.concat(href).join('/').replace(/\/\./g, '');
+      path = path.concat(href).join('/').replace(/\/\.\//g, '/');
       return path;
     }
     function importComponent(href, tagName) {
