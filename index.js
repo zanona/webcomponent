@@ -302,7 +302,7 @@ class WebComponent extends CoreWebComponent {
         const value = WebComponent.getObj(target, b.key);
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
-          if (typeof value === 'object') { return ''; }
+          if (typeof value === 'object' || typeof value === 'function') { return ''; }
         }
         return value || '';
       });
