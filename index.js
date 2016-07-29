@@ -275,15 +275,28 @@ class WebComponent extends CoreWebComponent {
     }
     Array.from(node.childNodes).forEach(this._dig.bind(this));
   }
-  _analyse(preserveContainerState) {
+  _analyse(nodes) {
     //console.log('--------', this.nodeName, '--------');
 
-    if (!preserveContainerState) { this._dig(this); }
-    if (this.shadowRoot) { this._dig(this.shadowRoot); }
-
-    //APPLY INITIAL VALUES
-    for (const key in this._bindings) {
-      this._updateListenerValues(key, this._bindings[key]);
+    // IF NODES ARE PROVIDED, ONLY DIG SPECIFIC NODES
+    // AND REFRESH BINDINGS ON THOSE
+    // THIS WILL HELP NOT RE-TRIGGERING PREVIOUSLY SET BINDINGS
+    if (nodes) {
+      nodes.map(this._dig.bind(this));
+      for (const key in this._bindings) {
+        // FILTER ONLY BINDINGS THAT ARE AFFECTED
+        const related = this._bindings[key].filter((binding) => {
+          return nodes.indexOf(binding.related) >= 0;
+        });
+        if (related.length) this._updateListenerValues(key, this._bindings[key]);
+      }
+    } else {
+      this._dig(this);
+      if (this.shadowRoot) { this._dig(this.shadowRoot); }
+      //APPLY INITIAL VALUES
+      for (const key in this._bindings) {
+        this._updateListenerValues(key, this._bindings[key]);
+      }
     }
   }
   _updateListenerNodeValue(listener) {
