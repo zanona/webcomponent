@@ -290,7 +290,8 @@ class WebComponent extends CoreWebComponent {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (_m) => {
-        let target;
+        let target,
+            value;
         if (listener.host._ownerInstance === listener.related) {
           // IF THE HOST PARENT INSTANCE IS THE SAME AS RELATED
           // IT MEANS ITS AN ATTRIBUTE REFERENCING TO THE PARENT
@@ -299,10 +300,15 @@ class WebComponent extends CoreWebComponent {
         } else {
           target = listener.host;
         }
-        const value = WebComponent.getObj(target, b.key);
+
+        value = WebComponent.getObj(target, b.key);
+
+        // IF VALUE IS FUNCTION, RENDER STORE `VALUE` PROPERTY
+        if (typeof value === 'function') value = value.value;
+
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
-          if (typeof value === 'object' || typeof value === 'function') { return ''; }
+          if (typeof value === 'object') { return ''; }
         }
         return value || '';
       });
@@ -350,9 +356,13 @@ class WebComponent extends CoreWebComponent {
     });
   }
   preset(key, value) {
-    var prevValue       = WebComponent.getObj(this, key),
-        valuesDiffer    = prevValue !== value,
-        isValueTemplate = WebComponent.searchBindings(value).length;
+    let prevValue = WebComponent.getObj(this, key);
+    //IF THIS.KEY IS FUNCTION, THEN ANALYSE AGAINST STORED `VALUE` PROPERTY
+    if (typeof prevValue === 'function') prevValue = prevValue.value;
+    if (typeof     value === 'function')     value = value.value;
+
+    const valuesDiffer    = prevValue !== value,
+          isValueTemplate = WebComponent.searchBindings(value).length;
 
     if (valuesDiffer && !isValueTemplate) { this.set(key, value, true); }
   }
@@ -362,12 +372,24 @@ class WebComponent extends CoreWebComponent {
     // SINCE INITIAL `SET` ALREADY PROVIDED CORRECT VALUE
     if (throughPreset && typeof value === 'undefined') { return; }
 
-    const keyListeners = this._bindings[key];
+    const keyListeners = this._bindings[key],
+          prevValue = WebComponent.getObj(this, key);
 
     // SETTING OBJ.VALUE
     // WILL CAUSE LISTENERS TO VALIDATED AGAINST
     // OBJ WHICH IS UNCHANGED, NOT TRIGGERING CHANGE
-    WebComponent.setObj(this, key, value);
+    if (typeof prevValue === 'function') {
+      // IF THE PROPERTY IS A FUNCTION,
+      // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
+      // AND ATTACHED STORED VALUE AS FUNCTION.VALUE
+      // SO IT CAN BE CHECKED AGAINS PRESETTING LATER ON
+      // ALLOW FUNCTION TO RETURN A VALUE WHICH WOULD OVERIDE THE SENT VALUE
+      const fnReturn = prevValue.call(this, value);
+      if (typeof fnReturn !== 'undefined') value = fnReturn;
+      WebComponent.setObj(prevValue, 'value', value);
+    } else {
+      WebComponent.setObj(this, key, value);
+    }
 
     // SHOULD PASS VALUE?
     if (keyListeners) {
