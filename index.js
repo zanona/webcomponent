@@ -120,6 +120,7 @@ class WebComponent extends CoreWebComponent {
     while ((key = keys.shift())) {
       if (keys.length) {
         rBase = rBase[key] ? rBase[key] : {};
+        if (typeof rBase === 'function') rBase = rBase._value || {};
       } else {
         return rBase[key];
       }
@@ -139,6 +140,7 @@ class WebComponent extends CoreWebComponent {
           rBase[key] = rBase[key] || (isArray ? [] : {});
           rBase = rBase[key];
         }
+        if (typeof rBase === 'function') rBase = rBase._value;
       } else {
         if (empty) { return delete rBase[key]; }
         return rBase[key] = value;
@@ -317,7 +319,7 @@ class WebComponent extends CoreWebComponent {
         value = WebComponent.getObj(target, b.key);
 
         // IF VALUE IS FUNCTION, RENDER STORE `VALUE` PROPERTY
-        if (typeof value === 'function') value = value.value;
+        if (typeof value === 'function') value = value._value;
 
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
@@ -371,8 +373,8 @@ class WebComponent extends CoreWebComponent {
   preset(key, value) {
     let prevValue = WebComponent.getObj(this, key);
     //IF THIS.KEY IS FUNCTION, THEN ANALYSE AGAINST STORED `VALUE` PROPERTY
-    if (typeof prevValue === 'function') prevValue = prevValue.value;
-    if (typeof     value === 'function')     value = value.value;
+    if (typeof prevValue === 'function') prevValue = prevValue._value;
+    if (typeof     value === 'function')     value =     value._value;
 
     const valuesDiffer    = prevValue !== value,
           isValueTemplate = WebComponent.searchBindings(value).length;
@@ -394,12 +396,12 @@ class WebComponent extends CoreWebComponent {
     if (typeof prevValue === 'function') {
       // IF THE PROPERTY IS A FUNCTION,
       // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
-      // AND ATTACHED STORED VALUE AS FUNCTION.VALUE
+      // AND ATTACHED STORED VALUE AS FUNCTION._VALUE
       // SO IT CAN BE CHECKED AGAINS PRESETTING LATER ON
       // ALLOW FUNCTION TO RETURN A VALUE WHICH WOULD OVERIDE THE SENT VALUE
       const fnReturn = prevValue.call(this, value);
       if (typeof fnReturn !== 'undefined') value = fnReturn;
-      WebComponent.setObj(prevValue, 'value', value);
+      WebComponent.setObj(prevValue, '_value', value);
     } else {
       WebComponent.setObj(this, key, value);
     }
