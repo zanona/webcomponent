@@ -80,6 +80,30 @@ class CoreWebComponent extends HTMLElement {
     });
     shadowRoot.appendChild(template);
   }
+  _addDescriptor(key) {
+    if (key === 'constructor') return;
+    if (typeof this[key] === 'function') return;
+    if (Object.getOwnPropertyDescriptor(this, key)) return;
+
+    const proto = this.constructor.prototype,
+          descriptor = Object.getOwnPropertyDescriptor(proto, key) || {};
+    function defaultGet()      { return this['_' + key]; }
+    function defaultSet(value) { return this['_' + key] = value; }
+    function mergedGet() {
+      const v = descriptor.get.bind(this)();
+      if (typeof v !== 'undefined') return v;
+      return defaultGet.bind(this)();
+    }
+    function mergedSet(value) {
+      const v = descriptor.set.bind(this)(value);
+      return defaultSet.bind(this)(typeof v === 'undefined' ? value : v);
+    }
+    Object.defineProperty(this, key, {
+      configurable: true,
+      get: descriptor.get ? mergedGet : defaultGet,
+      set: descriptor.set ? mergedSet : defaultSet
+    });
+  }
   createdCallback() {
     Object.defineProperty(this, '_bindings', { value: {} });
     // RELYING ON DOCUMENT.IMPORTED SINCE THE POLYFILL MESSES UP WITH
@@ -89,6 +113,13 @@ class CoreWebComponent extends HTMLElement {
       this.constructor = document.imported[name];
     }
     if (this.constructor.template) { this._linkTemplate(); }
+    // ADJUST DESCRIPTOR FOR INITAL class properties
+    // ALLOWING FUNCTIONALITY SUCH AS
+    // `SET KEY(VALUE) {...}` OR `GET KEY() {...}`
+    Object
+      .getOwnPropertyNames(this.constructor.prototype)
+      .forEach(this._addDescriptor.bind(this));
+
     if (this.created) this.created();
   }
   attachedCallback() {
@@ -268,9 +299,7 @@ class WebComponent extends CoreWebComponent {
         this._dig(attr);
       }
     }
-    if (node.nodeType === Node.ATTRIBUTE_NODE) {
-      this._registerProperties(node);
-    }
+    if (node.nodeType === Node.ATTRIBUTE_NODE) { this._registerProperties(node); }
     if (node.nodeType === Node.TEXT_NODE) {
       Object.defineProperty(node, ELEMENT, {value: node.parentNode});
       this._registerProperties(node);
@@ -290,13 +319,17 @@ class WebComponent extends CoreWebComponent {
         const related = this._bindings[key].filter((binding) => {
           return nodes.indexOf(binding.related) >= 0;
         });
-        if (related.length) this._updateListenerValues(key, this._bindings[key]);
+        // REGISTER DESCRIPTOR FOR ADDED KEYS
+        if (!key.match(/\./)) this._addDescriptor(key);
+        this._updateListenerValues(key, related);
       }
     } else {
       this._dig(this);
       if (this.shadowRoot) { this._dig(this.shadowRoot); }
       //APPLY INITIAL VALUES
       for (const key in this._bindings) {
+        // REGISTER DESCRIPTOR FOR ADDED KEYS
+        if (!key.match(/\./)) this._addDescriptor(key);
         this._updateListenerValues(key, this._bindings[key]);
       }
     }
