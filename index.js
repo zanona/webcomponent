@@ -151,7 +151,6 @@ class WebComponent extends CoreWebComponent {
     while ((key = keys.shift())) {
       if (keys.length) {
         rBase = rBase[key] ? rBase[key] : {};
-        if (typeof rBase === 'function') rBase = rBase._value || {};
       } else {
         return rBase[key];
       }
@@ -171,7 +170,6 @@ class WebComponent extends CoreWebComponent {
           rBase[key] = rBase[key] || (isArray ? [] : {});
           rBase = rBase[key];
         }
-        if (typeof rBase === 'function') rBase = rBase._value;
       } else {
         if (empty) { return delete rBase[key]; }
         return rBase[key] = value;
@@ -338,8 +336,7 @@ class WebComponent extends CoreWebComponent {
     let content = listener.originalValue;
     WebComponent.searchBindings(content).forEach((b) => {
       content = content.replace(b.raw, (_m) => {
-        let target,
-            value;
+        let target;
         if (listener.host._ownerInstance === listener.related) {
           // IF THE HOST PARENT INSTANCE IS THE SAME AS RELATED
           // IT MEANS ITS AN ATTRIBUTE REFERENCING TO THE PARENT
@@ -349,10 +346,7 @@ class WebComponent extends CoreWebComponent {
           target = listener.host;
         }
 
-        value = WebComponent.getObj(target, b.key);
-
-        // IF VALUE IS FUNCTION, RENDER STORE `VALUE` PROPERTY
-        if (typeof value === 'function') value = value._value;
+        const value = WebComponent.getObj(target, b.key);
 
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
         if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
@@ -372,6 +366,7 @@ class WebComponent extends CoreWebComponent {
         // DO NOT ALLOW RESETING VALUES THAT ARE NOT FROM OWN ELEMENT
         // SUCH AS `USER.NAME`, BUT ONLY WHEN IT'S A SELF ATTRIBUTE
         // SUCH AS `SRC`; AN ATTR NAME MATCHES THE LISTENER KEY
+        //
         if (!nullifyRelated && typeof value === 'undefined' && !ownProperty) {
           break;
         } else if (value !== relatedValue) {
@@ -404,12 +399,8 @@ class WebComponent extends CoreWebComponent {
     });
   }
   preset(key, value) {
-    let prevValue = WebComponent.getObj(this, key);
-    //IF THIS.KEY IS FUNCTION, THEN ANALYSE AGAINST STORED `VALUE` PROPERTY
-    if (typeof prevValue === 'function') prevValue = prevValue._value;
-    if (typeof     value === 'function')     value =     value._value;
-
-    const valuesDiffer    = prevValue !== value,
+    const prevValue = WebComponent.getObj(this, key),
+          valuesDiffer    = prevValue !== value,
           isValueTemplate = WebComponent.searchBindings(value).length;
 
     if (valuesDiffer && !isValueTemplate) { this.set(key, value, true); }
@@ -429,12 +420,9 @@ class WebComponent extends CoreWebComponent {
     if (typeof prevValue === 'function') {
       // IF THE PROPERTY IS A FUNCTION,
       // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
-      // AND ATTACHED STORED VALUE AS FUNCTION._VALUE
-      // SO IT CAN BE CHECKED AGAINS PRESETTING LATER ON
-      // ALLOW FUNCTION TO RETURN A VALUE WHICH WOULD OVERIDE THE SENT VALUE
-      const fnReturn = prevValue.call(this, value);
-      if (typeof fnReturn !== 'undefined') value = fnReturn;
-      WebComponent.setObj(prevValue, '_value', value);
+      // DO NO SET VALUE FOR THIS PROPERTY
+      // SINCE IT WOULD REPLACE THE FUNCTION
+      prevValue.call(this, value);
     } else {
       WebComponent.setObj(this, key, value);
     }
