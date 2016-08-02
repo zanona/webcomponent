@@ -217,7 +217,7 @@ class WebComponent extends CoreWebComponent {
 
   _findMethodScope(method) {
     let scope = this[WebComponent.INSTANCE_OF];
-    while (scope && !scope[method.name] === method) scope = scope[WebComponent.INSTANCE_OF];
+    while (scope && scope[method.name] !== method) scope = scope[WebComponent.INSTANCE_OF];
     return scope || this;
   }
   _updateSelfBindings(bindings) {
@@ -435,7 +435,11 @@ class WebComponent extends CoreWebComponent {
       // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
       // DO NO SET VALUE FOR THIS PROPERTY
       // SINCE IT WOULD REPLACE THE FUNCTION
-      prevValue(value);
+      //
+      // SINCE VALUE (FN) NEVER GETS ASSIGNED
+      // ITS NEEDED TO ADJUST SCOPE ON CALL TIME
+      const scope = this._findMethodScope(prevValue);
+      prevValue.call(scope, value);
     } else {
       WebComponent.setObj(this, key, value);
     }
