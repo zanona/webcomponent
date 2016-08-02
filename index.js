@@ -211,6 +211,11 @@ class WebComponent extends CoreWebComponent {
     return b;
   }
 
+  _findMethodScope(method) {
+    let scope = this[WebComponent.INSTANCE_OF];
+    while (scope && !scope[method.name] === method) scope = scope[WebComponent.INSTANCE_OF];
+    return scope || this;
+  }
   _updateSelfBindings(bindings) {
     // TODO REVIEW FOR ADDING DUPLICATES
     for (const key in bindings) {
@@ -389,9 +394,13 @@ class WebComponent extends CoreWebComponent {
   preset(key, value) {
     const prevValue = WebComponent.getObj(this, key),
           valuesDiffer    = prevValue !== value,
-          isValueTemplate = WebComponent.searchBindingTags(value).length;
+          isValueTemplate = WebComponent.searchBindingTags(value).length,
+          // DO NOT SET METHODS WHICH HAVE ALREADY BEEN BOUND
+          // FN.BIND() RETURNS A FUNCTION WITHOUT PROTOTYPE
+          isBoundMethod   = typeof value === 'function' && !value.prototype,
+          shouldSet       = valuesDiffer && !isValueTemplate && !isBoundMethod;
 
-    if (valuesDiffer && !isValueTemplate) { this.set(key, value, true); }
+    if (shouldSet) this.set(key, value, true);
   }
   set(key, value, throughPreset) {
     // IF VALUE UNDEFINED THROUGH PRESET, IGNORE IT
@@ -402,15 +411,24 @@ class WebComponent extends CoreWebComponent {
     const keyListeners = this._bindings[key],
           prevValue = WebComponent.getObj(this, key);
 
+    // IF PROPERTY IS A METHOD
+    // BIND IT TO THE INSTANCE OWNER
+    // THIS WILL ONLY BE CALLED ONCE
+    if (typeof value === 'function') {
+      const scope = this._findMethodScope(value);
+      value = value.bind(scope);
+    }
+
     // SETTING OBJ.VALUE
     // WILL CAUSE LISTENERS TO VALIDATED AGAINST
     // OBJ WHICH IS UNCHANGED, NOT TRIGGERING CHANGE
     if (typeof prevValue === 'function') {
+
       // IF THE PROPERTY IS A FUNCTION,
       // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
       // DO NO SET VALUE FOR THIS PROPERTY
       // SINCE IT WOULD REPLACE THE FUNCTION
-      prevValue.call(this, value);
+      prevValue(value);
     } else {
       WebComponent.setObj(this, key, value);
     }
