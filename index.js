@@ -247,7 +247,7 @@ class WebComponent extends CoreWebComponent {
   }
   _registerProperties(node) {
     const tags        = WebComponent.searchBindingTags(node._originalContent),
-          isComponent = node._ownerElement instanceof WebComponent,
+          isComponent = node[WebComponent.ELEMENT_OF] === this,
           isAttribute = node.nodeType === Node.ATTRIBUTE_NODE,
           bindings    = [];
 
@@ -256,10 +256,14 @@ class WebComponent extends CoreWebComponent {
       if (binding) bindings.push(binding);
     }
 
-    if (isComponent && isAttribute) {
+    // ONLY ALLOW SETTING INITIAL VALUES IF ATTRIBUTE
+    // ON OWN COMPONENT (I.E: <X-COMPONENT SRC=FOO>)
+    // EXCLUSE TAGS SINCE THOSE WILL BE EVENTUALLY BOUND AND PRESET LATER
+    if (isComponent && isAttribute && !tags.length) {
       const attr = node;
       attr._ownerElement.preset(attr.name, attr._originalContent);
     }
+
     return bindings;
   }
   _dig(node) {
