@@ -146,6 +146,7 @@ class CoreWebComponent extends HTMLElement {
 class WebComponent extends CoreWebComponent {
   static get INSTANCE_OF() { return '_ownerInstance'; }
   static get ELEMENT_OF()  { return '_ownerElement';  }
+  static get NORMALIZED_NAME() { return '_normalizedNodeName'; }
   static get ORIGINAL_CONTENT() { return '_originalContent'; }
   static flattenArray(array) { return array.reduce((p, c) => p.concat(c), []); }
   static getObj(base, path) {
@@ -210,6 +211,9 @@ class WebComponent extends CoreWebComponent {
     });
     return b;
   }
+  static normalizeNodeName(nodeName) {
+    return nodeName.replace(/\-(\w)/g, (_, l) => l.toUpperCase());
+  }
 
   _findMethodScope(method) {
     let scope = this[WebComponent.INSTANCE_OF];
@@ -236,7 +240,7 @@ class WebComponent extends CoreWebComponent {
       // HOST AND RELATED SWAP POSITION
       Object.assign(binding, {
         host       : node[WebComponent.ELEMENT_OF],
-        hostKey    : node.nodeName,
+        hostKey    : node[WebComponent.NORMALIZED_NAME],
         related    : node[WebComponent.INSTANCE_OF],
         relatedKey : tag.key
       });
@@ -245,7 +249,7 @@ class WebComponent extends CoreWebComponent {
         host       : node[WebComponent.INSTANCE_OF],
         hostKey    : tag.key,
         related    : node[WebComponent.ELEMENT_OF],
-        relatedKey : node.nodeName
+        relatedKey : node[WebComponent.NORMALIZED_NAME]
       });
     }
     return binding;
@@ -274,6 +278,9 @@ class WebComponent extends CoreWebComponent {
   _dig(node) {
     if (!node.hasOwnProperty(WebComponent.INSTANCE_OF)) {
       Object.defineProperty(node, WebComponent.INSTANCE_OF, {value: WebComponent.searchForHostComponent(node)});
+    }
+    if (!node.hasOwnProperty(WebComponent.NORMALIZED_NAME)) {
+      Object.defineProperty(node, WebComponent.NORMALIZED_NAME, {value: WebComponent.normalizeNodeName(node.nodeName)});
     }
     // STORE ORIGINAL CONTENT SO BINDING ANNOTATIONS CAN BE REMOVED
     if (!node.hasOwnProperty(WebComponent.ORIGINAL_CONTENT)) {
@@ -356,7 +363,7 @@ class WebComponent extends CoreWebComponent {
       if (listener.related instanceof WebComponent) {
         const value        = WebComponent.getObj(listener.host,    listener.hostKey),
               relatedValue = WebComponent.getObj(listener.related, listener.relatedKey),
-              ownProperty  = listener.node.nodeName === listener.relatedKey;
+              ownProperty  = listener.node[WebComponent.NORMALIZED_NAME] === listener.relatedKey;
         // DO NOT ALLOW RESETING VALUES THAT ARE NOT FROM OWN ELEMENT
         // SUCH AS `USER.NAME`, BUT ONLY WHEN IT'S A SELF ATTRIBUTE
         // SUCH AS `SRC`; AN ATTR NAME MATCHES THE LISTENER KEY
