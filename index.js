@@ -1,72 +1,81 @@
-Object.defineProperty(self, 'module', {
-  get() {
-    const BASE_LOADING = false,
-          script = document._currentScript || document.currentScript,
-          doc    = script ? script.ownerDocument : document;
+//BABEL CANNOT EXTEND NATIVE CLASSES
+//CONVERT THOSE TO FUNCTION AND PROTOTYPE IT
+if (typeof HTMLElement !== 'function'){
+  const proto = new Function();
+  proto.prototype = HTMLElement.prototype;
+  HTMLElement = proto;
+}
 
-    function extendComponent(exported) {
-      //CREATE NEW ELEMENT BASED ON TAG
-      //LOOK FOR OWN PROPERTIES
-      //ADD BASE PROPERTIES TO EXPORTED MODUE
-      const base = Object.getPrototypeOf(document.createElement(exported.extends)),
-            properties = Object.getOwnPropertyNames(base);
-
-      for (const key of properties) {
-        // DO NOT OVERWRITE CONSTRUCTOR
-        if (key === 'constructor') return;
-        const descriptor = Object.getOwnPropertyDescriptor(base, key);
-        Object.defineProperty(exported.prototype, key, descriptor);
-      }
+class Module {
+  get script()       { return document.currentScript; }
+  get document()     { return this.script ? this.script.ownerDocument : document; }
+  get imported()     { return this._imported = this._imported || {}; }
+  get importedMap()  { return this._importedMap = this._importedMap || {}; }
+  set exports(value) { this.document.exports = value; }
+  location(href) {
+    const isRelative = !!href.match(/^\.+\//),
+          a = document.createElement('a');
+    if (isRelative) {
+      const ownerLocation = this.location(this.document.baseURI),
+            ownerPath     = ownerLocation.filepath.replace(ownerLocation.filename, '');
+      href = ownerPath + href;
     }
-    function onLinkLoad(e) {
-      const ownerDoc = e.target.import,
-            template = ownerDoc.querySelector('template'),
-            exported = ownerDoc.exports,
-            tagName  = e.target.getAttribute('tag-name');
-
-      if (template && exported) { exported.attachTemplate(template); }
-      if (exported.extends) { extendComponent(exported); }
-      document.imported[tagName] = exported;
-      document.registerElement(tagName, exported);
+    a.href = href;
+    a.filepath = a.href.replace(a.search, '').replace(a.hash, '');
+    if (a.filepath.match(/\w$/) && !a.filepath.match(/\.html$/)) {
+      a.filepath += '.html';
     }
-    function addLink(href, tagName) {
-      const link = document.createElement('link');
-      link.rel   = 'import';
-      link.async = true;
-      link.href  = href + '.html';
-      link.setAttribute('tag-name', tagName);
-      link.addEventListener('load', onLinkLoad);
-      this.head.appendChild(link);
-    }
-    function getDocPath(href) {
-      const docURL = this.documentURI.split(/[?#]/)[0];
-      let path = docURL.replace(this.origin, '').split('/');
-      path.pop();
-      path = path.concat(href).join('/').replace(/\/\.\//g, '/');
-      return path;
-    }
-    function importComponent(href, tagName) {
-      const absoluteHREF = getDocPath.bind(this)(href);
-      tagName = tagName || href.split('.html')[0].split('/').pop();
-
-      document.imported = document.imported || {};
-      if (document.imported[tagName]) { return this; }
-      document.imported[tagName] = 'pending';
-
-      document.importedMap = document.importedMap || {};
-      document.importedMap[href] = tagName;
-
-      addLink.bind(BASE_LOADING ? document : this)(absoluteHREF, tagName);
-      return this;
-    }
-
-    if (!doc.hasOwnProperty('import')) {
-      Object.defineProperty(doc, 'import', { value: importComponent });
-    }
-
-    return doc;
+    a.filename = a.filepath.split('/').pop();
+    return a;
   }
-});
+  storeLink(tagName, baseURI, exported) {
+    const pathname = this.location(baseURI).pathname;
+    this.imported[tagName] = exported;
+    this.importedMap[pathname] = tagName;
+  }
+  extendComponent(exported) {
+    //CREATE NEW ELEMENT BASED ON TAG
+    //LOOK FOR OWN PROPERTIES
+    //ADD BASE PROPERTIES TO EXPORTED MODUE
+    const base = Object.getPrototypeOf(document.createElement(exported.extends)),
+          properties = Object.getOwnPropertyNames(base);
+
+    for (const key of properties) {
+      // DO NOT OVERWRITE CONSTRUCTOR
+      if (key === 'constructor') return;
+      const descriptor = Object.getOwnPropertyDescriptor(base, key);
+      Object.defineProperty(exported.prototype, key, descriptor);
+    }
+  }
+  onLinkLoad(e) {
+    const ownerDoc = e.target.import,
+          template = ownerDoc.querySelector('template'),
+          exported = ownerDoc.exports,
+          tagName  = e.target.getAttribute('tag-name');
+
+    if (template && exported) { exported.attachTemplate(template); }
+    if (exported.extends) { this.extendComponent(exported); }
+
+    document.registerElement(tagName, exported);
+
+    this.storeLink(tagName, ownerDoc.baseURI, exported);
+  }
+  import(href, tagName) {
+    href = this.location(href);
+    if (!tagName) tagName = href.filename.replace(/\.html$/, '');
+
+    if (this.imported[tagName]) return this;
+
+    const link = document.createElement('link');
+    link.rel   = 'import';
+    link.async = true;
+    link.href  = href.filepath;
+    link.setAttribute('tag-name', tagName);
+    link.addEventListener('load', this.onLinkLoad.bind(this));
+    this.document.head.appendChild(link);
+    return this;
+  }
+}
 
 class CoreWebComponent extends HTMLElement {
   static attachTemplate(template) {
@@ -457,4 +466,5 @@ class WebComponent extends CoreWebComponent {
   }
 }
 
-self.WebComponent = WebComponent;
+Object.defineProperty(self, 'WebComponent',  { value: WebComponent });
+Object.defineProperty(self, 'module', { value: Object.create(Module.prototype) });
