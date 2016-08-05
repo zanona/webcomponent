@@ -6,90 +6,15 @@ if (typeof HTMLElement !== 'function'){
   HTMLElement = proto;
 }
 
-class Module {
-  get script()       { return document.currentScript; }
-  get document()     { return this.script ? this.script.ownerDocument : document; }
-  get imported()     { return this._imported = this._imported || {}; }
-  get importedMap()  { return this._importedMap = this._importedMap || {}; }
-  set exports(value) { this.document.exports = value; }
-  location(href) {
-    const isRelative = !!href.match(/^\.+\//),
-          a = document.createElement('a');
-    if (isRelative) {
-      const ownerLocation = this.location(this.document.baseURI),
-            ownerPath     = ownerLocation.filepath.replace(ownerLocation.filename, '');
-      href = ownerPath + href;
-    }
-    a.href = href;
-    a.filepath = a.href.replace(a.search, '').replace(a.hash, '');
-    if (a.filepath.match(/\w$/) && !a.filepath.match(/\.html$/)) {
-      a.filepath += '.html';
-    }
-    a.filename = a.filepath.split('/').pop();
-    return a;
-  }
-  storeLink(tagName, baseURI, exported) {
-    const pathname = this.location(baseURI).pathname;
-    this.imported[tagName] = exported;
-    this.importedMap[pathname] = tagName;
-  }
-  extendComponent(exported) {
-    //CREATE NEW ELEMENT BASED ON TAG
-    //LOOK FOR OWN PROPERTIES
-    //ADD BASE PROPERTIES TO EXPORTED MODUE
-    const base = Object.getPrototypeOf(document.createElement(exported.extends)),
-          properties = Object.getOwnPropertyNames(base);
-
-    for (const key of properties) {
-      // DO NOT OVERWRITE CONSTRUCTOR
-      if (key === 'constructor') return;
-      const descriptor = Object.getOwnPropertyDescriptor(base, key);
-      Object.defineProperty(exported.prototype, key, descriptor);
-    }
-  }
-  onLinkLoad(e) {
-    const ownerDoc = e.target.import,
-          template = ownerDoc.querySelector('template'),
-          exported = ownerDoc.exports,
-          tagName  = e.target.getAttribute('tag-name');
-
-    if (template && exported) { exported.attachTemplate(template); }
-    if (exported.extends) { this.extendComponent(exported); }
-
-    document.registerElement(tagName, exported);
-
-    this.storeLink(tagName, ownerDoc.baseURI, exported);
-  }
-  import(href, tagName) {
-    href = this.location(href);
-    if (!tagName) tagName = href.filename.replace(/\.html$/, '');
-
-    if (this.imported[tagName]) return this;
-
-    const link = document.createElement('link');
-    link.rel   = 'import';
-    link.async = true;
-    link.href  = href.filepath;
-    link.setAttribute('tag-name', tagName);
-    link.addEventListener('load', this.onLinkLoad.bind(this));
-    this.document.head.appendChild(link);
-    return this;
-  }
-}
-
 class CoreWebComponent extends HTMLElement {
-  static attachTemplate(template) {
-    this.template = template.content;
-  }
-  _linkTemplate() {
+  static attachTemplate(template) { this.template = template.content; }
+  get root() { return this.shadowRoot; }
+  linkTemplate() {
     const shadowRoot = this.createShadowRoot(),
           template = document.importNode(this.constructor.template, true);
-    Object.defineProperty(this, 'root', {
-      get() { return (this._shadowRoot || this.shadowRoot); }
-    });
     shadowRoot.appendChild(template);
   }
-  _addDescriptor(key) {
+  addDescriptor(key) {
     if (key === 'constructor') return;
     if (typeof this[key] === 'function') return;
     if (Object.getOwnPropertyDescriptor(this, key)) return;
@@ -115,19 +40,13 @@ class CoreWebComponent extends HTMLElement {
   }
   createdCallback() {
     Object.defineProperty(this, '_bindings', { value: {} });
-    // RELYING ON DOCUMENT.IMPORTED SINCE THE POLYFILL MESSES UP WITH
-    // CONSTRUCTOR OBJECTS
-    if (!this.constructor.name) {
-      const name = this.getAttribute('is') || this.nodeName.toLowerCase();
-      this.constructor = document.imported[name];
-    }
-    if (this.constructor.template) { this._linkTemplate(); }
+    if (this.constructor.template) { this.linkTemplate(); }
     // ADJUST DESCRIPTOR FOR INITAL class properties
     // ALLOWING FUNCTIONALITY SUCH AS
     // `SET KEY(VALUE) {...}` OR `GET KEY() {...}`
     Object
       .getOwnPropertyNames(this.constructor.prototype)
-      .forEach(this._addDescriptor.bind(this));
+      .forEach(this.addDescriptor.bind(this));
 
     if (this.created) this.created();
   }
@@ -339,7 +258,7 @@ class WebComponent extends CoreWebComponent {
 
     for (const key in bindings) {
       this._updateListenerValues(bindings[key]);
-      if (!key.match(/\./)) this._addDescriptor(key);
+      if (!key.match(/\./)) this.addDescriptor(key);
     }
   }
   _updateListenerNodeValue(listener) {
@@ -466,5 +385,5 @@ class WebComponent extends CoreWebComponent {
   }
 }
 
+module.exports = {CoreWebComponent, WebComponent};
 Object.defineProperty(self, 'WebComponent',  { value: WebComponent });
-Object.defineProperty(self, 'module', { value: Object.create(Module.prototype) });
