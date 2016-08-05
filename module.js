@@ -29,7 +29,7 @@ class Module {
 
     for (const key of properties) {
       // DO NOT OVERWRITE CONSTRUCTOR
-      if (key === 'constructor') return;
+      if (key === 'constructor') continue;
       const descriptor = Object.getOwnPropertyDescriptor(base, key);
       Object.defineProperty(exported.prototype, key, descriptor);
     }
