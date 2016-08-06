@@ -56,7 +56,14 @@ class CoreWebComponent extends HTMLElement {
   }
   detachedCallback() {
     //REMOVE BINDINGS RELATED TO ELEMENT ONCE DETACHED
-    const bindingKeys = this._ownerInstance._bindings;
+    if (this.detached) this.detached();
+
+    //FIXME SAFARI DOING SOME STRANGE THINGS
+    if (!this._onwerInstance) return console.log('NO PARENT FOUND', this.outerHTML);
+
+    const parent = this._ownerInstance,
+          bindingKeys = parent._bindings;
+
     for (const key in bindingKeys) {
       const bindings = bindingKeys[key];
       for (const binding of bindings) {
@@ -68,7 +75,6 @@ class CoreWebComponent extends HTMLElement {
       //IF NO MORE BINDINGS, REMOVE KEY
       if (!bindings.length) { delete bindingKeys[key]; }
     }
-    if (this.detached) this.detached();
   }
 }
 class WebComponent extends CoreWebComponent {
@@ -77,6 +83,17 @@ class WebComponent extends CoreWebComponent {
   static get NORMALIZED_NAME() { return '_normalizedNodeName'; }
   static get ORIGINAL_CONTENT() { return '_originalContent'; }
   static flattenArray(array) { return array.reduce((p, c) => p.concat(c), []); }
+  static isEqual(a, b) {
+    const typeA = typeof a,
+          typeB = typeof b;
+    if (typeA === 'function' && typeB === 'function') {
+      return a.toString() === b.toString();
+    }
+    if (typeA === 'object' && typeB === 'object') {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+    return a === b;
+  }
   static getObj(base, path) {
     const keys    = path.split(/[\.\[\]]/).filter((i) => i);
     let key,
@@ -115,7 +132,7 @@ class WebComponent extends CoreWebComponent {
     if (text && text.replace) {
       text.replace(tag, (originalTag, oneWayKey, twoWayKey) => {
         tags.push({
-          //auto: !!twoWayKey,
+          auto: !!twoWayKey,
           key: oneWayKey || twoWayKey,
           tag: originalTag,
           originalContent: text
@@ -161,6 +178,7 @@ class WebComponent extends CoreWebComponent {
           binding = {
             node            : node,
             tag             : tag.tag,
+            auto            : tag.auto,
             originalContent : tag.originalContent
           };
     if (isSelf) {
@@ -179,6 +197,9 @@ class WebComponent extends CoreWebComponent {
         related    : node[WebComponent.ELEMENT_OF],
         relatedKey : node[WebComponent.NORMALIZED_NAME]
       });
+      //IF RELATED IS TEXTCONTENT OF A NODE
+      //THEN USE THE NODE ITSELF AS RELATED
+      if (binding.relatedKey === '#text') binding.related = node;
     }
     return binding;
   }
@@ -191,14 +212,17 @@ class WebComponent extends CoreWebComponent {
     for (const tag of tags) {
       const binding = this._bind(node, tag);
       if (binding) bindings.push(binding);
+      // CLEAN UP TAG VALUES ON NODES
+      node.textContent = node.textContent.replace(tag.tag, '');
     }
 
     // ONLY ALLOW SETTING INITIAL VALUES IF ATTRIBUTE
     // ON OWN COMPONENT (I.E: <X-COMPONENT SRC=FOO>)
     // EXCLUSE TAGS SINCE THOSE WILL BE EVENTUALLY BOUND AND PRESET LATER
     if (isComponent && isAttribute && !tags.length) {
-      const attr = node;
-      attr._ownerElement.preset(attr.name, attr._originalContent);
+      const attr = node,
+            value = attr[WebComponent.ORIGINAL_CONTENT];
+      attr[WebComponent.ELEMENT_OF].preset(attr.name, value);
     }
 
     return bindings;
@@ -257,8 +281,8 @@ class WebComponent extends CoreWebComponent {
     this._updateSelfBindings(bindings);
 
     for (const key in bindings) {
-      this._updateListenerValues(bindings[key]);
       if (!key.match(/\./)) this.addDescriptor(key);
+      this._updateListenerValues(bindings[key]);
     }
   }
   _updateListenerNodeValue(listener) {
@@ -266,7 +290,7 @@ class WebComponent extends CoreWebComponent {
     WebComponent.searchBindingTags(content).forEach((b) => {
       content = content.replace(b.tag, (_m) => {
         let target;
-        if (listener.host._ownerInstance === listener.related) {
+        if (listener.host[WebComponent.INSTANCE_OF] === listener.related) {
           // IF THE HOST PARENT INSTANCE IS THE SAME AS RELATED
           // IT MEANS ITS AN ATTRIBUTE REFERENCING TO THE PARENT
           // INSTANCE INSTEAD OF THE HOST ITSELF
@@ -278,8 +302,9 @@ class WebComponent extends CoreWebComponent {
         const value = WebComponent.getObj(target, b.key);
 
         //SKIP OBJECTS AND ARRAYS VALUES FOR ATTRIBUTE VALUES
-        if (listener.node.nodeType === Node.ATTRIBUTE_NODE) {
-          if (typeof value === 'object') { return ''; }
+        if (value && listener.node.nodeType === Node.ATTRIBUTE_NODE) {
+          const valueType = typeof value;
+          if (valueType.match(/object|function/)) { return ''; }
         }
         return value || '';
       });
@@ -290,17 +315,30 @@ class WebComponent extends CoreWebComponent {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
         const value        = WebComponent.getObj(listener.host,    listener.hostKey),
-              relatedValue = WebComponent.getObj(listener.related, listener.relatedKey),
-              ownProperty  = listener.node[WebComponent.NORMALIZED_NAME] === listener.relatedKey;
-        // DO NOT ALLOW RESETING VALUES THAT ARE NOT FROM OWN ELEMENT
-        // SUCH AS `USER.NAME`, BUT ONLY WHEN IT'S A SELF ATTRIBUTE
-        // SUCH AS `SRC`; AN ATTR NAME MATCHES THE LISTENER KEY
-        if (!nullifyRelated && typeof value === 'undefined' && !ownProperty) {
-          break;
-        } else if (value !== relatedValue) {
-          // DO NOT SET IF VALUE IS SAME AS RELATED, AVOID ENDLESS LOOP
-          listener.related.preset(listener.relatedKey, nullifyRelated ? null : value);
+              prevValue    = WebComponent.getObj(listener.related, listener.relatedKey),
+              hasValue     = typeof value !== 'undefined',
+              valuesDiffer = hasValue && !WebComponent.isEqual(prevValue, value);
+
+        /*
+        function log() {
+          //console.log.apply(console, arguments);
         }
+        log(
+          //'BINDING IS AUTO?', listener.auto,
+          valuesDiffer ? 'WILL SET' : 'WILL NOT SET',
+          listener.related.nodeName + '.' + listener.relatedKey, 'FROM', prevValue, 'TO', value,
+          'BASED ON',
+          listener.host.nodeName + '.' + listener.hostKey, value
+          );
+        */
+
+        // ONLY SET IF VALUE IS SAME AS RELATED, AVOID ENDLESS LOOP
+        if (!valuesDiffer) continue;
+
+        listener.related.preset(
+          listener.relatedKey,
+          nullifyRelated ? null : value
+        );
       }
       this._updateListenerNodeValue(listener);
     }
@@ -311,8 +349,10 @@ class WebComponent extends CoreWebComponent {
       .replace(/\$/g, '\\$')
       .replace(/\[/g, '\\[')
       .replace(/\]/g, '\\]');
+    //console.log('REFRESH DEPENDENT', objName);
     Object.keys(this._bindings).forEach((b) => {
-      const belongsToObject = new RegExp('^' + objName + '[\\.\\[]').test(b);
+      const expression = new RegExp('^' + objName + '[\\.\\[]'),
+            belongsToObject = expression.test(b);
       if (belongsToObject) {
         const keyListeners = this._bindings[b];
         if (keyListeners) {
