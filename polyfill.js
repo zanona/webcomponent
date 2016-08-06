@@ -3,7 +3,9 @@ function polyfill() {
         CoreWebComponent = require('./').CoreWebComponent,
         coreProto        = CoreWebComponent.prototype,
         createdCallback  = coreProto.createdCallback,
-        linkTemplate     = coreProto.linkTemplate;
+        linkTemplate     = coreProto.linkTemplate,
+        innerHTML        = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerHTML'),
+        innerHTMLSet     = innerHTML.set;
 
   Object.defineProperty(Module.prototype, 'currentScript', {
     get() { return document._currentScript; }
@@ -33,6 +35,12 @@ function polyfill() {
       self.WebComponents.ShadowCSS.shimStyling(this.shadowRoot, this.nodeName.toLowerCase());
     }
   });
+
+  innerHTML.set = function (value) {
+    innerHTMLSet.call(this, value);
+    self.CustomElements.upgradeSubtree(this);
+  };
+  Object.defineProperty(HTMLElement.prototype, 'innerHTML', innerHTML);
 }
 
 module.exports = function () {
@@ -60,6 +68,6 @@ module.exports = function () {
   } else {
     require('./module'),
     require('./').CoreWebComponent;
-    dispatchReadyEvent();
+    setTimeout(dispatchReadyEvent, 0);
   }
 };
