@@ -59,7 +59,7 @@ class CoreWebComponent extends HTMLElement {
     if (this.detached) this.detached();
 
     //FIXME SAFARI DOING SOME STRANGE THINGS
-    if (!this._onwerInstance) return console.log('NO PARENT FOUND', this.outerHTML);
+    if (!this._onwerInstance) return; //console.log('NO PARENT FOUND', this.outerHTML);
 
     const parent = this._ownerInstance,
           bindingKeys = parent._bindings;
@@ -121,7 +121,7 @@ class WebComponent extends CoreWebComponent {
           rBase = rBase[key];
         }
       } else {
-        if (empty) { return delete rBase[key]; }
+        if (empty) { return rBase[key] = void 0; }
         return rBase[key] = value;
       }
     }
