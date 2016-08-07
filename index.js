@@ -16,11 +16,15 @@ class CoreWebComponent extends HTMLElement {
   }
   addDescriptor(key) {
     if (key === 'constructor') return;
-    if (typeof this[key] === 'function') return;
-    if (Object.getOwnPropertyDescriptor(this, key)) return;
 
     const proto = this.constructor.prototype,
           descriptor = Object.getOwnPropertyDescriptor(proto, key) || {};
+
+    // ALLOW OVERIDE FOR GETTERS AND SETTERS ONLY
+    // ONCE SETTING A GETTER, A SETTER IS AUTOMATICALLY SET TO UNDEFINED
+    // IN CASE ITS NOT DELCARED, AND VICE VERSA
+    if (!descriptor.hasOwnProperty('set') && !descriptor.hasOwnProperty('get')) return;
+
     function defaultGet()      { return this['_' + key]; }
     function defaultSet(value) { return this['_' + key] = value; }
     function mergedGet() {
@@ -32,21 +36,26 @@ class CoreWebComponent extends HTMLElement {
       const v = descriptor.set.bind(this)(value);
       return defaultSet.bind(this)(typeof v === 'undefined' ? value : v);
     }
-    Object.defineProperty(this, key, {
+
+    var newDescriptor = {
       configurable: true,
       get: descriptor.get ? mergedGet : defaultGet,
       set: descriptor.set ? mergedSet : defaultSet
-    });
+    };
+
+    Object.defineProperty(this, key, newDescriptor);
   }
   createdCallback() {
     Object.defineProperty(this, '_bindings', { value: {} });
+
     if (this.constructor.template) { this.linkTemplate(); }
+
     // ADJUST DESCRIPTOR FOR INITAL class properties
     // ALLOWING FUNCTIONALITY SUCH AS
     // `SET KEY(VALUE) {...}` OR `GET KEY() {...}`
     Object
       .getOwnPropertyNames(this.constructor.prototype)
-      .forEach(this.addDescriptor.bind(this));
+      .forEach(this.addDescriptor, this);
 
     if (this.created) this.created();
   }
@@ -281,7 +290,7 @@ class WebComponent extends CoreWebComponent {
     this._updateSelfBindings(bindings);
 
     for (const key in bindings) {
-      if (!key.match(/\./)) this.addDescriptor(key);
+      //if (!key.match(/\./)) this.addDescriptor(key);
       this._updateListenerValues(bindings[key]);
     }
   }
