@@ -36,6 +36,8 @@ function polyfill() {
     }
   });
 
+  // APPARENTLY INNERHTML DOES NOT TRIGGER CREATEDCALLBACK
+  // MUST FORCE SUBTREE UPGRDADE
   innerHTML.set = function (value) {
     innerHTMLSet.call(this, value);
     self.CustomElements.upgradeSubtree(this);
