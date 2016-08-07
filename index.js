@@ -18,23 +18,31 @@ class CoreWebComponent extends HTMLElement {
     if (key === 'constructor') return;
 
     const proto = this.constructor.prototype,
-          descriptor = Object.getOwnPropertyDescriptor(proto, key) || {};
+          descriptor = Object.getOwnPropertyDescriptor(proto, key) || {},
+          htmlDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, key) || {};
 
     // ALLOW OVERIDE FOR GETTERS AND SETTERS ONLY
     // ONCE SETTING A GETTER, A SETTER IS AUTOMATICALLY SET TO UNDEFINED
     // IN CASE ITS NOT DELCARED, AND VICE VERSA
     if (!descriptor.hasOwnProperty('set') && !descriptor.hasOwnProperty('get')) return;
 
-    function defaultGet()      { return this['_' + key]; }
-    function defaultSet(value) { return this['_' + key] = value; }
+    function defaultGet() {
+      const value = this['_' + key];
+      if (typeof value !== 'undefined') return value;
+      if (htmlDescriptor.get) { return htmlDescriptor.get.call(this); }
+    }
+    function defaultSet(value) {
+      if (htmlDescriptor.set) htmlDescriptor.set.call(this, value);
+      return this['_' + key] = value;
+    }
     function mergedGet() {
       const v = descriptor.get.bind(this)();
       if (typeof v !== 'undefined') return v;
-      return defaultGet.bind(this)();
+      return defaultGet.call(this);
     }
     function mergedSet(value) {
       const v = descriptor.set.bind(this)(value);
-      return defaultSet.bind(this)(typeof v === 'undefined' ? value : v);
+      return defaultSet.call(this, typeof v === 'undefined' ? value : v);
     }
 
     var newDescriptor = {
@@ -102,6 +110,10 @@ class WebComponent extends CoreWebComponent {
       return JSON.stringify(a) === JSON.stringify(b);
     }
     return a === b;
+  }
+  static isHTMLBooleanAttribute(key) {
+    //MORE: https://github.com/kangax/html-minifier/issues/63
+    return (/^(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|declare|default|defaultchecked|defaultmuted|defaultselected|defer|disabled|draggable|enabled|formnovalidate|hidden|indeterminate|inert|ismap|itemscope|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|pauseonexit|readonly|required|reversed|scoped|seamless|selected|sortable|spellcheck|translate|truespeed|typemustmatch|visible)$/).test(key);
   }
   static getObj(base, path) {
     const keys    = path.split(/[\.\[\]]/).filter((i) => i);
@@ -376,6 +388,10 @@ class WebComponent extends CoreWebComponent {
     });
   }
   preset(key, value) {
+    //IF VALUE IS EMPTY STRING ON HTML BOOLEAN ATTRIBUTE
+    //SUCH AS HIDDEN, CONVERT TO TRUE
+    if (WebComponent.isHTMLBooleanAttribute(key) && value === '') value = true;
+
     const prevValue = WebComponent.getObj(this, key),
           valuesDiffer    = prevValue !== value,
           isValueTemplate = WebComponent.searchBindingTags(value).length,
