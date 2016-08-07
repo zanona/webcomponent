@@ -116,7 +116,7 @@ class WebComponent extends CoreWebComponent {
     return (/^(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|declare|default|defaultchecked|defaultmuted|defaultselected|defer|disabled|draggable|enabled|formnovalidate|hidden|indeterminate|inert|ismap|itemscope|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|pauseonexit|readonly|required|reversed|scoped|seamless|selected|sortable|spellcheck|translate|truespeed|typemustmatch|visible)$/).test(key);
   }
   static getObj(base, path) {
-    const keys    = path.split(/[\.\[\]]/).filter((i) => i);
+    const keys = path.split(/[\.\[\]]/).filter((i) => i);
     let key,
         rBase = base || {};
     while ((key = keys.shift())) {
@@ -128,6 +128,11 @@ class WebComponent extends CoreWebComponent {
     }
   }
   static setObj(base, path, value) {
+    //TODO MUST CLONE OBJ SO GETTERS AND SETTERS ARE NOT
+    //TRIGGERED; STORE PATHS AS DIG DEEPER AND ONCE FINISHED
+    //START TO TRIGGER SETTER FROM INSIDE OUT
+    //THIS WILL ALLOW SETTER OBSERVERS ON TOP-MOST PROPERTIES
+    //TO HAVE CORRECT UPDATED VALUES
     const keys  = path.split(/[\.\[\]]/).filter((i) => i),
           empty = typeof value === 'undefined' || value === null;
     let key,
@@ -377,20 +382,19 @@ class WebComponent extends CoreWebComponent {
       .replace(/\$/g, '\\$')
       .replace(/\[/g, '\\[')
       .replace(/\]/g, '\\]');
-    //console.log('REFRESH DEPENDENT', objName);
-    Object.keys(this._bindings).forEach((b) => {
-      const expression = new RegExp('^' + objName + '[\\.\\[]'),
-            belongsToObject = expression.test(b);
-      if (belongsToObject) {
-        const keyListeners = this._bindings[b];
-        if (keyListeners) {
-          this._updateListenerValues(keyListeners);
-        } else {
-          // IT MAY HAPPEN THAN WHEN AN ITEM IS DELETED
-          // THE RELATED LISTENERS ARE STILL ATTACHED;
-          // IN SUCH CASES, VERIFY AND DELETE IT
-          delete this._bindings[b];
-        }
+
+    Object.keys(this._bindings).filter((b) => {
+      const expression = new RegExp('^' + objName + '[\\.\\[]');
+      return expression.test(b);
+    }).forEach((b) => {
+      const keyListeners = this._bindings[b];
+      if (keyListeners) {
+        this._updateListenerValues(keyListeners);
+      } else {
+        // IT MAY HAPPEN THAN WHEN AN ITEM IS DELETED
+        // THE RELATED LISTENERS ARE STILL ATTACHED;
+        // IN SUCH CASES, VERIFY AND DELETE IT
+        delete this._bindings[b];
       }
     });
   }
