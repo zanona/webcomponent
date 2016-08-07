@@ -181,10 +181,17 @@ class WebComponent extends CoreWebComponent {
     return nodeName.replace(/\-(\w)/g, (_, l) => l.toUpperCase());
   }
 
-  _findMethodScope(method) {
+  _findMethodScope(method, key) {
     let scope = this[WebComponent.INSTANCE_OF];
     while (scope && scope[method.name] !== method) scope = scope[WebComponent.INSTANCE_OF];
-    return scope || this;
+    scope = scope || this;
+
+    //ONCE HITS TOPMOST LEVEL, LOOK FOR BINDINGS
+    //CHECKING SCOPE RELATION HORIZONTALLY
+    const bindings = scope._bindings[key];
+    if (bindings) { scope = bindings[0].related; }
+
+    return scope;
   }
   _updateSelfBindings(bindings) {
     // TODO REVIEW FOR ADDING DUPLICATES
@@ -415,7 +422,7 @@ class WebComponent extends CoreWebComponent {
     // BIND IT TO THE INSTANCE OWNER
     // THIS WILL ONLY BE CALLED ONCE
     if (typeof value === 'function') {
-      const scope = this._findMethodScope(value);
+      const scope = this._findMethodScope(value, key);
       value = value.bind(scope);
     }
 
