@@ -119,38 +119,61 @@ class WebComponent extends CoreWebComponent {
     const keys = path.split(/[\.\[\]]/).filter((i) => i);
     let key,
         rBase = base || {};
+
     while ((key = keys.shift())) {
-      if (keys.length) {
-        rBase = rBase[key] ? rBase[key] : {};
-      } else {
-        return rBase[key];
-      }
+      if (!keys.length) break;
+
+      const current = rBase[key];
+      if (!current) break;
+      rBase = current;
     }
+    return rBase[key];
   }
   static setObj(base, path, value) {
-    //TODO MUST CLONE OBJ SO GETTERS AND SETTERS ARE NOT
-    //TRIGGERED; STORE PATHS AS DIG DEEPER AND ONCE FINISHED
-    //START TO TRIGGER SETTER FROM INSIDE OUT
-    //THIS WILL ALLOW SETTER OBSERVERS ON TOP-MOST PROPERTIES
-    //TO HAVE CORRECT UPDATED VALUES
-    const keys  = path.split(/[\.\[\]]/).filter((i) => i),
-          empty = typeof value === 'undefined' || value === null;
-    let key,
-        rBase = base || {};
+    const keys    = path.split(/[\.\[\]]/).filter((i) => i),
+          nullify = typeof value === 'undefined' || value === null,
+          isArray = (k) => !isNaN(k),
+          copy    = Object.assign({}, base),
+          keysCopy= [];
+
+    let key, rBase = copy;
+
     while ((key = keys.shift())) {
-      if (keys.length) {
-        if (empty) {
-          rBase = rBase[key] ? rBase[key] : rBase;
-        } else {
-          const isArray = !isNaN([keys[0]]);
-          rBase[key] = rBase[key] || (isArray ? [] : {});
-          rBase = rBase[key];
-        }
-      } else {
-        if (empty) { return rBase[key] = void 0; }
-        return rBase[key] = value;
-      }
+
+      if (!keys.length) break;
+
+      const prev      = rBase,
+            current   = rBase[key],
+            targetObj = isArray(keys[0]) ? [] : {};
+
+      keysCopy.push(key);
+      if (current) rBase = current;
+
+      if (nullify && !current) break;
+
+      prev[key] = Object.assign(targetObj, prev[key]);
+
+      rBase = prev[key];
     }
+
+    //IF NULLIFYING ARRAY ITEM, REMOVE IT FROM ARRAY
+    if (nullify && isArray(key)) {
+      rBase.splice(key, 1);
+    } else {
+      rBase[key] = nullify ? void(0) : value;
+    }
+
+    //ACTIVATE SETTERS IN BASE OBJ IN THE PROPER ORDER (INSIDE OUT)
+    keysCopy.push(key);
+    while ((key  = keysCopy.pop())) {
+      const p    = keysCopy.join('.'),
+            obj  = this.getObj(base, p) || base,
+            cObj = this.getObj(copy, p) || copy;
+
+      obj[key] = cObj[key];
+    }
+
+    return value;
   }
   static searchBindingTags(text) {
     const tag = /\[{2}([a-z-0-9-\.\_$\[\]]+)\]{2}|\{{2}([a-z-0-9-\.\_$\[\]]+)\}{2}/gi,
