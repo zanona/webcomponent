@@ -115,25 +115,73 @@ class WebComponent extends CoreWebComponent {
     //MORE: https://github.com/kangax/html-minifier/issues/63
     return (/^(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|declare|default|defaultchecked|defaultmuted|defaultselected|defer|disabled|draggable|enabled|formnovalidate|hidden|indeterminate|inert|ismap|itemscope|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|pauseonexit|readonly|required|reversed|scoped|seamless|selected|sortable|spellcheck|translate|truespeed|typemustmatch|visible)$/).test(key);
   }
-  static getObj(base, path) {
-    const keys = path.split(/[\.\[\]]/).filter((i) => i);
+
+  static getObjLastAvailableProperty(base, path) {
+    const keys = path.split(/[\.\[\]]/).filter((i) => i),
+          isArrayKey = (k) => !isNaN(k),
+          keyPath = [];
     let key,
         rBase = base || {};
 
     while ((key = keys.shift())) {
-      if (!keys.length) break;
+      keyPath.push(key);
+      if (!rBase[key]) break;
+      const nextKey         = keys[0],
+            current         = rBase[key],
+            next            = current[nextKey],
+            hasNext         = typeof next !== 'undefined',
+            isCurrentArray  = Array.isArray(current);
 
-      const current = rBase[key];
-      if (!current) break;
+      if (isArrayKey(nextKey) && !isCurrentArray) break;
+      if (!hasNext) break;
       rBase = current;
     }
-    return rBase[key];
+    return { path: keyPath, value: rBase };
+  }
+  static getObj(base, path) {
+    const keys = path.split(/[\.\[\]]/).filter((i) => i),
+          isArrayKey = (k) => !isNaN(k);
+    let key,
+        rBase = base || {};
+
+    while ((key = keys.shift())) {
+      const current = rBase[key],
+            isCurrentArray = Array.isArray(rBase);
+      if (isArrayKey(key) && !isCurrentArray) return;
+      if (typeof current === 'undefined') return;
+      rBase = current;
+    }
+    return rBase;
+  }
+
+  static applyValue(base, key, value) {
+    const isArray = (k) => !isNaN(k),
+          nullify = typeof value === 'undefined' || value === null;
+
+    let descriptor = Object.getOwnPropertyDescriptor(base, key);
+    descriptor = descriptor && (descriptor.get || descriptor.set);
+
+    if (nullify && isArray(key)) {
+      //IF NULLIFYING ARRAY ITEM, REMOVE ITEM FROM ARRAY
+      base.splice(key, 1);
+    } else if (nullify && !descriptor) {
+      //IF NO GETTER/SETTER, OK TO DELETE PROPERTY
+      delete base[key];
+    } else {
+      value = nullify ? void(0) : value;
+      base[key] = value;
+    }
+  }
+  static objAssign(target, source = {}) {
+    const keys = Object.getOwnPropertyNames(source);
+    keys.forEach((key) => target[key] = source[key] );
+    return target;
   }
   static setObj(base, path, value) {
     const keys    = path.split(/[\.\[\]]/).filter((i) => i),
           nullify = typeof value === 'undefined' || value === null,
           isArray = (k) => !isNaN(k),
-          copy    = Object.assign({}, base),
+          copy    = WebComponent.objAssign({}, base),
           keysCopy= [];
 
     let key, rBase = copy;
@@ -141,40 +189,48 @@ class WebComponent extends CoreWebComponent {
     while ((key = keys.shift())) {
 
       if (!keys.length) break;
+      keysCopy.push(key);
 
       const prev      = rBase,
-            current   = rBase[key],
             targetObj = isArray(keys[0]) ? [] : {};
 
-      keysCopy.push(key);
+      let current = rBase[key];
+
       if (current) rBase = current;
 
+      if (typeof current !== 'object') current = null;
       if (nullify && !current) break;
 
-      prev[key] = Object.assign(targetObj, prev[key]);
+      prev[key] = Object.assign(targetObj, current);
 
       rBase = prev[key];
     }
 
-    //IF NULLIFYING ARRAY ITEM, REMOVE IT FROM ARRAY
-    if (nullify && isArray(key)) {
-      rBase.splice(key, 1);
-    } else {
-      rBase[key] = nullify ? void(0) : value;
-    }
+    WebComponent.applyValue(rBase, key, value);
 
     //ACTIVATE SETTERS IN BASE OBJ IN THE PROPER ORDER (INSIDE OUT)
-    keysCopy.push(key);
-    while ((key  = keysCopy.pop())) {
-      const p    = keysCopy.join('.'),
-            obj  = this.getObj(base, p) || base,
-            cObj = this.getObj(copy, p) || copy;
+    function refreshOriginalObj() {
+      const lastBase = WebComponent.getObjLastAvailableProperty(base, keysCopy.join('.')),
+            lastPath = lastBase.path.join('.'),
+            lastCopy = this.getObj(copy, lastPath),
+            lastKey  = lastBase.path.pop();
 
-      obj[key] = cObj[key];
+      WebComponent.applyValue(lastBase.value, lastKey, lastCopy);
+
+      let k;
+      while ((k = lastBase.path.pop())) {
+        const p = lastBase.path.join('.'),
+              v = WebComponent.getObj(base, p);
+        v[k] = v[k];
+      }
     }
+
+    keysCopy.push(key);
+    refreshOriginalObj.call(this);
 
     return value;
   }
+
   static searchBindingTags(text) {
     const tag = /\[{2}([a-z-0-9-\.\_$\[\]]+)\]{2}|\{{2}([a-z-0-9-\.\_$\[\]]+)\}{2}/gi,
           tags = [];
