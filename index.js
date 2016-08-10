@@ -76,7 +76,7 @@ class CoreWebComponent extends HTMLElement {
     if (this.detached) this.detached();
 
     //FIXME SAFARI DOING SOME STRANGE THINGS
-    if (!this._onwerInstance) return; //console.log('NO PARENT FOUND', this.outerHTML);
+    if (!this._ownerInstance) return console.log('NO PARENT FOUND', this);
 
     const parent = this._ownerInstance,
           bindingKeys = parent._bindings;
@@ -148,27 +148,26 @@ class WebComponent extends CoreWebComponent {
       const current = rBase[key],
             isCurrentArray = Array.isArray(rBase);
       if (isArrayKey(key) && !isCurrentArray) return;
-      if (typeof current === 'undefined') return;
+      if (typeof current === 'undefined' || current === null) return current;
       rBase = current;
     }
     return rBase;
   }
 
   static applyValue(base, key, value) {
-    const isArray = (k) => !isNaN(k),
-          nullify = typeof value === 'undefined' || value === null;
+    const nullify = typeof value === 'undefined' || value === null;
 
     let descriptor = Object.getOwnPropertyDescriptor(base, key);
     descriptor = descriptor && (descriptor.get || descriptor.set);
 
-    if (nullify && isArray(key)) {
+    if (nullify && Array.isArray(base)) {
       //IF NULLIFYING ARRAY ITEM, REMOVE ITEM FROM ARRAY
       base.splice(key, 1);
     } else if (nullify && !descriptor) {
       //IF NO GETTER/SETTER, OK TO DELETE PROPERTY
       delete base[key];
     } else {
-      value = nullify ? void(0) : value;
+      //PRESERVE NULL IN ORDER TO PROGRATE NULLIFY ACTION
       base[key] = value;
     }
   }
@@ -206,7 +205,11 @@ class WebComponent extends CoreWebComponent {
       rBase = prev[key];
     }
 
-    WebComponent.applyValue(rBase, key, value);
+    rBase[key] = value;
+    //DO NOT TRIGGER APPLYVALUE SINCE NULLIFY WOULD DELETE PROPERTY
+    //LOSING NULLIFY ACTION WHEN APPLIED TO ORIGINAL OBJECT
+    //SINCE IT WOULD BE UNDEFINED
+    //WebComponent.applyValue(rBase, key, value);
 
     //ACTIVATE SETTERS IN BASE OBJ IN THE PROPER ORDER (INSIDE OUT)
     function refreshOriginalObj() {
