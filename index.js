@@ -429,7 +429,7 @@ class WebComponent extends CoreWebComponent {
   _updateListenerValues(keyListeners, nullifyRelated) {
     for (const listener of keyListeners) {
       if (listener.related instanceof WebComponent) {
-        const value        = WebComponent.getObj(listener.host,    listener.hostKey),
+        const value        = nullifyRelated ? null : WebComponent.getObj(listener.host,    listener.hostKey),
               prevValue    = WebComponent.getObj(listener.related, listener.relatedKey),
               hasValue     = typeof value !== 'undefined',
               valuesDiffer = hasValue && !WebComponent.isEqual(prevValue, value);
@@ -440,6 +440,7 @@ class WebComponent extends CoreWebComponent {
         }
         log(
           //'BINDING IS AUTO?', listener.auto,
+         'SHOULD NULLIFY ' + nullifyRelated,
           valuesDiffer ? 'WILL SET' : 'WILL NOT SET',
           listener.related.nodeName + '.' + listener.relatedKey, 'FROM', prevValue, 'TO', value,
           'BASED ON',
@@ -458,27 +459,29 @@ class WebComponent extends CoreWebComponent {
       this._updateListenerNodeValue(listener);
     }
   }
-  _refreshDependentListeners(objName) {
+  _findDependentListeners(objName) {
     //EXPAND BEFORE CONVERTING TO REGEXP
     objName = objName
       .replace(/\$/g, '\\$')
       .replace(/\[/g, '\\[')
       .replace(/\]/g, '\\]');
 
-    Object.keys(this._bindings).filter((b) => {
+    const bindings = Object.keys(this._bindings).filter((b) => {
       const expression = new RegExp('^' + objName + '[\\.\\[]');
       return expression.test(b);
-    }).forEach((b) => {
-      const keyListeners = this._bindings[b];
-      if (keyListeners) {
-        this._updateListenerValues(keyListeners);
-      } else {
+    }).map((key) => {
+      const binding = this._bindings[key];
+      if (!binding) {
         // IT MAY HAPPEN THAN WHEN AN ITEM IS DELETED
         // THE RELATED LISTENERS ARE STILL ATTACHED;
         // IN SUCH CASES, VERIFY AND DELETE IT
-        delete this._bindings[b];
+        console.error('REMOVING FROM _findDependentListeners', key);
+        delete this._bindings[binding];
       }
-    });
+      return binding;
+    }).reduce((p, c) => p.concat(c), []);
+
+    return bindings;
   }
   preset(key, value) {
     //IF VALUE IS EMPTY STRING ON HTML BOOLEAN ATTRIBUTE
@@ -501,8 +504,7 @@ class WebComponent extends CoreWebComponent {
     // SINCE INITIAL `SET` ALREADY PROVIDED CORRECT VALUE
     if (throughPreset && typeof value === 'undefined') { return; }
 
-    const keyListeners = this._bindings[key],
-          prevValue = WebComponent.getObj(this, key);
+    const prevValue = WebComponent.getObj(this, key);
 
     // IF PROPERTY IS A METHOD
     // BIND IT TO THE INSTANCE OWNER
@@ -530,16 +532,12 @@ class WebComponent extends CoreWebComponent {
       WebComponent.setObj(this, key, value);
     }
 
-    // SHOULD PASS VALUE?
-    if (keyListeners) {
-      // FLAG NULL VALUE IN ORDER TO NULLIFY RELATED COMPONENTS
-      this._updateListenerValues(keyListeners, value === null);
-    }
-
     // LOOKUP FOR BINDINGS KEYS THAT START WITH `KEY.` or `KEY[`
     // AND UPDATE THOSE ACCORDINGLY
-    //this._refreshDependentListeners(key.split(/\.|\[/)[0]);
-    this._refreshDependentListeners(key);
+    var keyListeners = this._bindings[key] || [];
+    keyListeners = keyListeners.concat(this._findDependentListeners(key));
+    // FLAG NULL VALUE IN ORDER TO NULLIFY RELATED COMPONENTS
+    this._updateListenerValues(keyListeners, value === null);
   }
 }
 
