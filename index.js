@@ -395,10 +395,7 @@ class WebComponent extends CoreWebComponent {
     bindings = WebComponent.groupBindings(bindings);
     this._updateSelfBindings(bindings);
 
-    for (const key in bindings) {
-      //if (!key.match(/\./)) this.addDescriptor(key);
-      this._updateListenerValues(bindings[key]);
-    }
+    for (const key in bindings) this._refreshRelatedListeners(key);
   }
   _updateListenerNodeValue(listener) {
     let content = listener.originalContent;
@@ -426,10 +423,30 @@ class WebComponent extends CoreWebComponent {
     });
     listener.node.textContent = content;
   }
-  _updateListenerValues(keyListeners, nullifyRelated) {
-    for (const listener of keyListeners) {
+  _getRelatedListenersForPath(path) {
+    //EXPAND BEFORE CONVERTING TO REGEXP
+    path = path
+      .replace(/\$/g, '\\$')
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]');
+
+    let expr = /^path$|^path[\.\[]/;
+    expr = new RegExp(expr.source.replace(/path/g, path));
+
+    return Object.keys(this._bindings)
+      .filter((key)  => expr.test(key))
+      //SORT FROM SMALL TO LARGE PATH TO SPREAD VALUES IN CORRECT ORDER
+      //NOT SURE IF NECESSARY BUT IT SEEMS CLEANER
+      .sort((a, b)   => a.split('.').length > b.split('.').length ? 1 : -1)
+      .map((key)     => this._bindings[key])
+      .reduce((p, c) => p.concat(c), []);
+  }
+  _refreshRelatedListeners(key, nullifyRelated) {
+    const listeners = this._getRelatedListenersForPath(key);
+
+    for (const listener of listeners) {
       if (listener.related instanceof WebComponent) {
-        const value        = nullifyRelated ? null : WebComponent.getObj(listener.host,    listener.hostKey),
+        const value        = nullifyRelated ? null : WebComponent.getObj(listener.host, listener.hostKey),
               prevValue    = WebComponent.getObj(listener.related, listener.relatedKey),
               hasValue     = typeof value !== 'undefined',
               valuesDiffer = hasValue && !WebComponent.isEqual(prevValue, value);
@@ -449,39 +466,11 @@ class WebComponent extends CoreWebComponent {
         */
 
         // ONLY SET IF VALUE IS SAME AS RELATED, AVOID ENDLESS LOOP
-        if (!valuesDiffer) continue;
-
-        listener.related.preset(
-          listener.relatedKey,
-          nullifyRelated ? null : value
-        );
+        if (!valuesDiffer) { continue; }
+        listener.related.preset(listener.relatedKey, value);
       }
       this._updateListenerNodeValue(listener);
     }
-  }
-  _findDependentListeners(objName) {
-    //EXPAND BEFORE CONVERTING TO REGEXP
-    objName = objName
-      .replace(/\$/g, '\\$')
-      .replace(/\[/g, '\\[')
-      .replace(/\]/g, '\\]');
-
-    const bindings = Object.keys(this._bindings).filter((b) => {
-      const expression = new RegExp('^' + objName + '[\\.\\[]');
-      return expression.test(b);
-    }).map((key) => {
-      const binding = this._bindings[key];
-      if (!binding) {
-        // IT MAY HAPPEN THAN WHEN AN ITEM IS DELETED
-        // THE RELATED LISTENERS ARE STILL ATTACHED;
-        // IN SUCH CASES, VERIFY AND DELETE IT
-        console.error('REMOVING FROM _findDependentListeners', key);
-        delete this._bindings[binding];
-      }
-      return binding;
-    }).reduce((p, c) => p.concat(c), []);
-
-    return bindings;
   }
   preset(key, value) {
     //IF VALUE IS EMPTY STRING ON HTML BOOLEAN ATTRIBUTE
@@ -532,12 +521,18 @@ class WebComponent extends CoreWebComponent {
       WebComponent.setObj(this, key, value);
     }
 
-    // LOOKUP FOR BINDINGS KEYS THAT START WITH `KEY.` or `KEY[`
-    // AND UPDATE THOSE ACCORDINGLY
-    var keyListeners = this._bindings[key] || [];
-    keyListeners = keyListeners.concat(this._findDependentListeners(key));
-    // FLAG NULL VALUE IN ORDER TO NULLIFY RELATED COMPONENTS
-    this._updateListenerValues(keyListeners, value === null);
+    //CHECK FOR NULL TO BE SPREAD ACROSS RELATED LISTENERS DOWN THE CHAIN
+    this._refreshRelatedListeners(key, value === null);
+  }
+  broadcast(key) {
+    const listeners = this._getRelatedListenersForPath(key);
+    for (const listener of listeners) {
+      const keys = listener.relatedKey.split(/[\.\[\]]/).filter((i) => i),
+            lastKey = keys.pop(),
+            lastObj = WebComponent.getObj(listener.related, keys.join('.'));
+      //BROADCAST BY ACTIVATING SETTER
+      lastObj ? lastObj[lastKey] = lastObj[lastKey] : void 0;
+    }
   }
 }
 
