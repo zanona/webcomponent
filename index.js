@@ -41,8 +41,14 @@ class CoreWebComponent extends HTMLElement {
       return defaultGet.call(this);
     }
     function mergedSet(value) {
-      const v = descriptor.set.bind(this)(value);
-      return defaultSet.call(this, typeof v === 'undefined' ? value : v);
+      const customValue = descriptor.set.bind(this)(value),
+            hasCustomValue = typeof customValue !== 'undefined';
+
+      value = hasCustomValue ? customValue : value;
+      defaultSet.call(this, value);
+
+      if (hasCustomValue) this._refreshRelatedListeners(key);
+      return value;
     }
 
     var newDescriptor = {
