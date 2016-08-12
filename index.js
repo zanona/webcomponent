@@ -103,12 +103,15 @@ class WebComponent extends CoreWebComponent {
   static isEqual(a, b) {
     const typeA = typeof a,
           typeB = typeof b;
-    if (typeA === 'function' && typeB === 'function') {
-      return a.toString() === b.toString();
-    }
-    if (typeA === 'object' && typeB === 'object') {
-      return JSON.stringify(a) === JSON.stringify(b);
-    }
+
+    if (typeA !== typeB) return false;
+
+    if (typeA === 'function') a = a.toString();
+    if (typeB === 'function') b = b.toString();
+
+    if (typeA === 'object') a = JSON.stringify(a);
+    if (typeB === 'object') b = JSON.stringify(b);
+
     return a === b;
   }
   static isHTMLBooleanAttribute(key) {
@@ -446,68 +449,44 @@ class WebComponent extends CoreWebComponent {
 
     for (const listener of listeners) {
       if (listener.related instanceof WebComponent) {
-        const value        = nullifyRelated ? null : WebComponent.getObj(listener.host, listener.hostKey),
-              prevValue    = WebComponent.getObj(listener.related, listener.relatedKey),
-              hasValue     = typeof value !== 'undefined',
-              valuesDiffer = hasValue && !WebComponent.isEqual(prevValue, value);
+        let value       = WebComponent.getObj(listener.host, listener.hostKey);
+        const prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
 
-        /*
-        function log() {
-          //console.log.apply(console, arguments);
-        }
-        log(
-          //'BINDING IS AUTO?', listener.auto,
-         'SHOULD NULLIFY ' + nullifyRelated,
-          valuesDiffer ? 'WILL SET' : 'WILL NOT SET',
-          listener.related.nodeName + '.' + listener.relatedKey, 'FROM', prevValue, 'TO', value,
-          'BASED ON',
-          listener.host.nodeName + '.' + listener.hostKey, value
-          );
-        */
+        if (nullifyRelated) value = null;
 
-        // ONLY SET IF VALUE IS SAME AS RELATED, AVOID ENDLESS LOOP
-        if (!valuesDiffer) { continue; }
-        listener.related.preset(listener.relatedKey, value);
+        listener.related.preset(listener.relatedKey, value, prevValue);
       }
       this._updateListenerNodeValue(listener);
     }
   }
-  preset(key, value) {
+  preset(key, value, prevValue) {
     //IF VALUE IS EMPTY STRING ON HTML BOOLEAN ATTRIBUTE
     //SUCH AS HIDDEN, CONVERT TO TRUE
     if (WebComponent.isHTMLBooleanAttribute(key) && value === '') value = true;
 
-    const prevValue = WebComponent.getObj(this, key),
-          valuesDiffer    = prevValue !== value,
+    const hasValue        = typeof value !== 'undefined',
+          valuesDiffer    = hasValue && !WebComponent.isEqual(prevValue, value),
           isValueTemplate = WebComponent.searchBindingTags(value).length,
           // DO NOT SET METHODS WHICH HAVE ALREADY BEEN BOUND
-          // FN.BIND() RETURNS A FUNCTION WITHOUT PROTOTYPE
-          isBoundMethod   = typeof value === 'function' && !value.prototype,
-          shouldSet       = valuesDiffer && !isValueTemplate && !isBoundMethod;
+          isBoundMethod = typeof value === 'function' && value.bound,
+          shouldSet     = valuesDiffer && !isValueTemplate && !isBoundMethod;
 
-    if (shouldSet) this.set(key, value, true);
+    if (shouldSet) this.set(key, value);
   }
-  set(key, value, throughPreset) {
-    // IF VALUE UNDEFINED THROUGH PRESET, IGNORE IT
-    // THIS WILL PREVENT DELETING OBJ VALUES
-    // SINCE INITIAL `SET` ALREADY PROVIDED CORRECT VALUE
-    if (throughPreset && typeof value === 'undefined') { return; }
-
+  set(key, value) {
     const prevValue = WebComponent.getObj(this, key);
-
     // IF PROPERTY IS A METHOD
     // BIND IT TO THE INSTANCE OWNER
     // THIS WILL ONLY BE CALLED ONCE
     if (typeof value === 'function') {
       const scope = this._findMethodScope(value, key);
       value = value.bind(scope);
+      //FLAG THAT METHOD HAS BEEN BOUND SO IT CAN BE IDENTIFIABLE
+      //RELYING ON PROTOTYPE SEEMS FAULTY
+      Object.defineProperty(value, 'bound', {value: true});
     }
 
-    // SETTING OBJ.VALUE
-    // WILL CAUSE LISTENERS TO VALIDATED AGAINST
-    // OBJ WHICH IS UNCHANGED, NOT TRIGGERING CHANGE
     if (typeof prevValue === 'function') {
-
       // IF THE PROPERTY IS A FUNCTION,
       // RUN THE FUNCTION WITH THE VALUE AS ATTRIBUTE
       // DO NO SET VALUE FOR THIS PROPERTY
@@ -518,6 +497,9 @@ class WebComponent extends CoreWebComponent {
       const scope = this._findMethodScope(prevValue);
       prevValue.call(scope, value);
     } else {
+      // SETTING OBJ.VALUE
+      // WILL CAUSE LISTENERS TO VALIDATED AGAINST
+      // OBJ WHICH IS UNCHANGED, NOT TRIGGERING CHANGE
       WebComponent.setObj(this, key, value);
     }
 
