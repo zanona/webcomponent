@@ -32,6 +32,7 @@ class CoreWebComponent extends HTMLElement {
       if (htmlDescriptor.get) { return htmlDescriptor.get.call(this); }
     }
     function defaultSet(value) {
+      //IF HTML ATTRIBUTE SUCH AS HIDDEN, CALL IT AS WELL
       if (htmlDescriptor.set) htmlDescriptor.set.call(this, value);
       return this['_' + key] = value;
     }
@@ -455,10 +456,14 @@ class WebComponent extends CoreWebComponent {
 
     for (const listener of listeners) {
       if (listener.related instanceof WebComponent) {
-        let value       = WebComponent.getObj(listener.host, listener.hostKey);
-        const prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
+        const isSelf = this === listener.host && key === listener.hostKey,
+              prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
 
-        if (nullifyRelated) value = null;
+        let value = WebComponent.getObj(listener.host, listener.hostKey);
+
+        // SKIP ASSIGNING NULL WHEN COMING FROM INITIAL ELEMENT
+        // SINCE THIS WOULD CALL INFINITE LOOP
+        if (nullifyRelated && !isSelf) value = null;
 
         listener.related.preset(listener.relatedKey, value, prevValue);
       }
