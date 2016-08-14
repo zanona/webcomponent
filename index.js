@@ -79,7 +79,6 @@ class CoreWebComponent extends HTMLElement {
   }
   detachedCallback() {
     //REMOVE BINDINGS RELATED TO ELEMENT ONCE DETACHED
-    if (this.detached) this.detached();
 
     //FIXME SAFARI DOING SOME STRANGE THINGS
     if (!this._ownerInstance) return console.log('NO PARENT FOUND', this);
@@ -98,6 +97,7 @@ class CoreWebComponent extends HTMLElement {
       //IF NO MORE BINDINGS, REMOVE KEY
       if (!bindings.length) { delete bindingKeys[key]; }
     }
+    if (this.detached) this.detached();
   }
 }
 class WebComponent extends CoreWebComponent {
