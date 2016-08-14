@@ -107,7 +107,7 @@ class WebComponent extends CoreWebComponent {
   static get NORMALIZED_NAME() { return '_normalizedNodeName'; }
   static get ORIGINAL_CONTENT() { return '_originalContent'; }
   static flattenArray(array) { return array.reduce((p, c) => p.concat(c), []); }
-  static isEqual(a, b) {
+  static isEqual(a, b, strict) {
     const typeA = typeof a,
           typeB = typeof b;
 
@@ -116,8 +116,10 @@ class WebComponent extends CoreWebComponent {
     if (typeA === 'function') a = a.toString();
     if (typeB === 'function') b = b.toString();
 
-    //if (typeA === 'object') a = JSON.stringify(a);
-    //if (typeB === 'object') b = JSON.stringify(b);
+    if (strict) {
+      if (typeA === 'object') a = JSON.stringify(a);
+      if (typeB === 'object') b = JSON.stringify(b);
+    }
 
     return a === b;
   }
@@ -456,14 +458,11 @@ class WebComponent extends CoreWebComponent {
 
     for (const listener of listeners) {
       if (listener.related instanceof WebComponent) {
-        const isSelf = this === listener.host && key === listener.hostKey,
-              prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
 
         let value = WebComponent.getObj(listener.host, listener.hostKey);
+        const prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
 
-        // SKIP ASSIGNING NULL WHEN COMING FROM INITIAL ELEMENT
-        // SINCE THIS WOULD CALL INFINITE LOOP
-        if (nullifyRelated && !isSelf) value = null;
+        if (nullifyRelated && typeof value === 'undefined') value = null;
 
         listener.related.preset(listener.relatedKey, value, prevValue);
       }
@@ -480,9 +479,11 @@ class WebComponent extends CoreWebComponent {
           isValueTemplate = WebComponent.searchBindingTags(value).length,
           // DO NOT SET METHODS WHICH HAVE ALREADY BEEN BOUND
           isBoundMethod = typeof value === 'function' && value.bound,
-          shouldSet     = valuesDiffer && !isValueTemplate && !isBoundMethod;
+          shouldSet = valuesDiffer && !isValueTemplate && !isBoundMethod,
+          shouldNullify = prevValue !== null && typeof prevValue !== 'undefined',
+          shouldProceed = value === null ? shouldNullify : shouldSet;
 
-    if (shouldSet) this.set(key, value);
+    if (shouldProceed) this.set(key, value);
   }
   set(key, value) {
     const prevValue = WebComponent.getObj(this, key);
