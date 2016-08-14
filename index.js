@@ -115,8 +115,8 @@ class WebComponent extends CoreWebComponent {
     if (typeA === 'function') a = a.toString();
     if (typeB === 'function') b = b.toString();
 
-    if (typeA === 'object') a = JSON.stringify(a);
-    if (typeB === 'object') b = JSON.stringify(b);
+    //if (typeA === 'object') a = JSON.stringify(a);
+    //if (typeB === 'object') b = JSON.stringify(b);
 
     return a === b;
   }
