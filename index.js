@@ -283,12 +283,16 @@ class WebComponent extends CoreWebComponent {
   _findMethodScope(method, key) {
     let scope = this[WebComponent.INSTANCE_OF];
     while (scope && scope[method.name] !== method) scope = scope[WebComponent.INSTANCE_OF];
-    scope = scope || this;
 
-    //ONCE HITS TOPMOST LEVEL, LOOK FOR BINDINGS
-    //CHECKING SCOPE RELATION HORIZONTALLY
-    const bindings = scope._bindings[key];
-    if (bindings) { scope = bindings[0].related; }
+    //IF IT CANT FIND ON PARENT LOOK FOR BINDINGS
+    if (!scope) {
+      //ONCE HITS TOPMOST LEVEL, LOOK FOR BINDINGS
+      //CHECKING SCOPE RELATION HORIZONTALLY
+      const bindings = this._bindings[key];
+      if (bindings) {
+        scope = bindings[0].related;
+      }
+    }
 
     return scope;
   }
