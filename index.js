@@ -434,7 +434,7 @@ class WebComponent extends CoreWebComponent {
           const valueType = typeof value;
           if (valueType.match(/object|function/)) { return ''; }
         }
-        return value || '';
+        return typeof value === 'undefined' ? '' : value;
       });
     });
     listener.node.textContent = content;
