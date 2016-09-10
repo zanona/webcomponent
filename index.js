@@ -75,8 +75,8 @@ class CoreWebComponent extends HTMLElement {
     if (this.created) this.created();
   }
   attachedCallback() {
-    if (this.attached) this.attached();
     this._analyse(this);
+    if (this.attached) this.attached();
   }
   detachedCallback() {
     //REMOVE BINDINGS RELATED TO ELEMENT ONCE DETACHED
