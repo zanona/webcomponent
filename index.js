@@ -351,9 +351,10 @@ class WebComponent extends CoreWebComponent {
     // ON OWN COMPONENT (I.E: <X-COMPONENT SRC=FOO>)
     // EXCLUSE TAGS SINCE THOSE WILL BE EVENTUALLY BOUND AND PRESET LATER
     if (isComponent && isAttribute && !tags.length) {
-      const attr = node,
+      const attr  = node,
+            name  = WebComponent.normalizeNodeName(attr.name),
             value = attr[WebComponent.ORIGINAL_CONTENT];
-      attr[WebComponent.ELEMENT_OF].preset(attr.name, value);
+      attr[WebComponent.ELEMENT_OF].preset(name, value);
     }
 
     return bindings;
