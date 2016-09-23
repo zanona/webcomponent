@@ -21,10 +21,21 @@ class CoreWebComponent extends HTMLElement {
           descriptor = Object.getOwnPropertyDescriptor(proto, key) || {},
           htmlDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, key) || {};
 
-    // ALLOW OVERIDE FOR GETTERS AND SETTERS ONLY
+    // OVERIDING INSTANCE METHODS
+    // BY DEFAULT METHODS ARE NOT BOUND TO INSTANCE ITSELF
+    // WHERE `THIS` BECOMES ANYTHING SET BY THE CALLER
+    // WE ARE FORCING BINDING EVERY METHOD TO THE INSTANCE
+    // TO MAKE DEVELOPMENT MORE FLUID, GENERATING CLEANER CODE
+
+    if (!descriptor.hasOwnProperty('set') && !descriptor.hasOwnProperty('get')) {
+      const newDescriptor = { configurable: true, value: descriptor.value.bind(this) };
+      Object.defineProperty(this, key, newDescriptor);
+      return;
+    }
+
+    // OVERIDING GETTERS AND SETTERS
     // ONCE SETTING A GETTER, A SETTER IS AUTOMATICALLY SET TO UNDEFINED
     // IN CASE ITS NOT DELCARED, AND VICE VERSA
-    if (!descriptor.hasOwnProperty('set') && !descriptor.hasOwnProperty('get')) return;
 
     function defaultGet() {
       const value = this['_' + key];
