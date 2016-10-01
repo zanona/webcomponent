@@ -347,7 +347,8 @@ class WebComponent extends CoreWebComponent {
   }
   _registerProperties(node) {
     const tags        = WebComponent.searchBindingTags(node._originalContent),
-          isComponent = node[WebComponent.ELEMENT_OF] === this,
+          nodeOwner   = node[WebComponent.ELEMENT_OF],
+          isComponent = nodeOwner === this,
           isAttribute = node.nodeType === Node.ATTRIBUTE_NODE,
           bindings    = [];
 
@@ -358,14 +359,35 @@ class WebComponent extends CoreWebComponent {
       node.textContent = node.textContent.replace(tag.tag, '');
     }
 
+    // CHECK THROUGH OTHER NODES THAT SET PROPERTIES ON THIS COMPONENT
+    // BEFORE IT WAS CREATED, SET INITIAL ONES WHEN FOUND
+    if (tags.length && nodeOwner instanceof WebComponent && nodeOwner !== this) {
+      const name         = WebComponent.normalizeNodeName(bindings[0].hostKey),
+            relatedValue = WebComponent.getObj(bindings[0].related, bindings[0].relatedKey),
+            prevValue    = this[name];
+      //console.log('WILL SEt', this, name, relatedValue, prevValue, bindings);
+      this.preset(name, relatedValue, prevValue);
+    }
+
     // ONLY ALLOW SETTING INITIAL VALUES IF ATTRIBUTE
     // ON OWN COMPONENT (I.E: <X-COMPONENT SRC=FOO>)
-    // EXCLUSE TAGS SINCE THOSE WILL BE EVENTUALLY BOUND AND PRESET LATER
-    if (isComponent && isAttribute && !tags.length) {
-      const attr  = node,
-            name  = WebComponent.normalizeNodeName(attr.name),
-            value = attr[WebComponent.ORIGINAL_CONTENT];
-      attr[WebComponent.ELEMENT_OF].preset(name, value);
+    if (isComponent && isAttribute) {
+      const name         = WebComponent.normalizeNodeName(node.name),
+            value        = node[WebComponent.ORIGINAL_CONTENT],
+            prevValue    = WebComponent.getObj(this, name),
+            relatedValue = bindings[0] && WebComponent.getObj(bindings[0].related, bindings[0].relatedKey);
+            //TODO: CHECK MULTIPLE TAGS/BINDINGS
+
+      if (tags.length) {
+        if (typeof relatedValue === 'undefined' ||
+            typeof relatedValue === 'function'  ||
+            typeof prevValue    === 'function') return bindings;
+        this.preset(name, relatedValue, prevValue);
+      } else {
+        if (typeof value === 'undefined' ||
+            typeof value === 'function') return bindings;
+        this.preset(name, value, prevValue);
+      }
     }
 
     return bindings;
@@ -391,18 +413,18 @@ class WebComponent extends CoreWebComponent {
 
     let bindings = [];
 
+    const isSelf           = node === this,
+          hasShadowRoot    = isSelf && node.shadowRoot,
+          isSelfShadowRoot = (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE && node[WebComponent.INSTANCE_OF] === this),
+          isNotComponent   = !(node instanceof WebComponent),
+          isAllowedToDig   = isSelf || isSelfShadowRoot || isNotComponent;
+
     if (node.attributes) {
       [...node.attributes].forEach((attribute) => {
         Object.defineProperty(attribute, WebComponent.ELEMENT_OF, {value: node});
         bindings.push(this._dig(attribute));
       });
     }
-
-    const isSelf           = node === this,
-          hasShadowRoot    = isSelf && node.shadowRoot,
-          isSelfShadowRoot = (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE && node[WebComponent.INSTANCE_OF] === this),
-          isNotComponent   = !(node instanceof WebComponent),
-          isAllowedToDig   = isSelf || isSelfShadowRoot || isNotComponent;
 
     // DO NOT ALLOW ELEMENT DIGGING INTO ANOTHER WEBCOMPONENT
     if (isAllowedToDig) {
@@ -417,13 +439,12 @@ class WebComponent extends CoreWebComponent {
   _analyse(nodes) {
     //ACCEPT BOTH SINGLE OR ARRAY ITEMS
     if (!Array.isArray(nodes)) nodes = [nodes];
-
     let bindings;
     bindings = WebComponent.flattenArray(nodes.map(this._dig, this));
     bindings = WebComponent.groupBindings(bindings);
     this._updateSelfBindings(bindings);
 
-    for (const key in bindings) this._refreshRelatedListeners(key);
+    for (const key in bindings) this._refreshRelatedListeners(key, void 0, bindings);
   }
   _updateListenerNodeValue(listener) {
     let content = listener.originalContent;
@@ -469,18 +490,25 @@ class WebComponent extends CoreWebComponent {
       .map((key)     => this._bindings[key])
       .reduce((p, c) => p.concat(c), []);
   }
-  _refreshRelatedListeners(key, nullifyRelated) {
-    const listeners = this._getRelatedListenersForPath(key);
+  _refreshRelatedListeners(key, nullifyRelated, bindings) {
+    const listeners = bindings ? bindings[key] : this._getRelatedListenersForPath(key);
 
     for (const listener of listeners) {
       if (listener.related instanceof WebComponent) {
 
         let value = WebComponent.getObj(listener.host, listener.hostKey);
-        const prevValue = WebComponent.getObj(listener.related, listener.relatedKey);
+        const prevValue = WebComponent.getObj(listener.related, listener.relatedKey),
+              relatedReady = Object.keys(listener.related._bindings).length;
 
         if (nullifyRelated && typeof value === 'undefined') value = null;
 
-        listener.related.preset(listener.relatedKey, value, prevValue);
+        // IF RELATED COMPONENT IS NOT READY (HAS NOT BEEN ANALYZED)
+        // LEAVE TO THE _RegisterProperties METHOD TO ASSIGN IT WHEN
+        // THE RELATED COMPONENT IS CREATED
+        if (relatedReady || typeof value === 'function') {
+          //console.log('LISTENER', this, listener.related, key, prevValue, value);
+          listener.related.preset(listener.relatedKey, value, prevValue);
+        }
       }
       this._updateListenerNodeValue(listener);
     }
@@ -523,6 +551,7 @@ class WebComponent extends CoreWebComponent {
       // SINCE VALUE (FN) NEVER GETS ASSIGNED
       // ITS NEEDED TO ADJUST SCOPE ON CALL TIME
       const scope = this._findMethodScope(prevValue);
+
       prevValue.call(scope, value);
     } else {
       // SETTING OBJ.VALUE
