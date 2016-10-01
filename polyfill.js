@@ -1,6 +1,6 @@
 function polyfill() {
   const Module = require('./module'),
-        CoreWebComponent = require('./').CoreWebComponent,
+        CoreWebComponent = require('./index').CoreWebComponent,
         coreProto        = CoreWebComponent.prototype,
         createdCallback  = coreProto.createdCallback,
         linkTemplate     = coreProto.linkTemplate,
@@ -45,7 +45,7 @@ function polyfill() {
   Object.defineProperty(HTMLElement.prototype, 'innerHTML', innerHTML);
 }
 
-module.exports = function () {
+module.exports = function (polyfillURL) {
   const hasCustomElement = 'registerElement' in document,
         hasImports = 'import' in document.createElement('link'),
         hasTemplates = 'content' in document.createElement('template'),
@@ -60,8 +60,8 @@ module.exports = function () {
   if (needsPolyfill) {
 
     const script = document.createElement('script');
-    script.src = '//cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.22/webcomponents.min.js';
-    document.body.appendChild(script);
+    script.src = polyfillURL || '//cdnjs.cloudflare.com/ajax/libs/webcomponentsjs/0.7.22/webcomponents.min.js';
+    document.head.appendChild(script);
     script.addEventListener('load', polyfill);
 
     self.addEventListener('WebComponentsReady', () => {
@@ -69,7 +69,7 @@ module.exports = function () {
     });
   } else {
     require('./module'),
-    require('./').CoreWebComponent;
+    require('./index').CoreWebComponent;
     setTimeout(dispatchReadyEvent, 0);
   }
 };
