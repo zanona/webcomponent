@@ -117,6 +117,7 @@ class WebComponent extends CoreWebComponent {
   static get ELEMENT_OF()  { return '_ownerElement';  }
   static get NORMALIZED_NAME() { return '_normalizedNodeName'; }
   static get ORIGINAL_CONTENT() { return '_originalContent'; }
+  static get IS_SHADOW()   { return '_isShadow'; }
   static flattenArray(array) { return array.reduce((p, c) => p.concat(c), []); }
   static isEqual(a, b, strict) {
     const typeA = typeof a,
@@ -330,28 +331,51 @@ class WebComponent extends CoreWebComponent {
             tag             : tag.tag,
             auto            : tag.auto,
             originalContent : tag.originalContent
+          },
+          selfBinding = () => {
+            return Object.assign({
+              host       : node[WebComponent.ELEMENT_OF],
+              hostKey    : node[WebComponent.NORMALIZED_NAME],
+              related    : node[WebComponent.INSTANCE_OF],
+              relatedKey : tag.key
+            }, binding);
+          },
+          internalBinding = () => {
+            const b = Object.assign({
+              host       : node[WebComponent.INSTANCE_OF],
+              hostKey    : tag.key,
+              related    : node[WebComponent.ELEMENT_OF],
+              relatedKey : node[WebComponent.NORMALIZED_NAME]
+            }, binding);
+            //IF RELATED IS TEXTCONTENT OF A NODE
+            //THEN USE THE NODE ITSELF AS RELATED
+            if (b.relatedKey === '#text') b.related = node;
+            return b;
           };
+          /*
+          externalBinding = () => {
+            const b = Object.assign({
+              host       : node[WebComponent.INSTANCE_OF][WebComponent.INSTANCE_OF],
+              hostKey    : tag.key,
+              related    : node[WebComponent.ELEMENT_OF],
+              relatedKey : node[WebComponent.NORMALIZED_NAME]
+            }, binding);
+            if (b.relatedKey === '#text') b.related = node;
+            return b;
+          };
+          */
     if (isSelf) {
       // IF BINDING IS FOUND ON OWN COMPONENT TAG
       // HOST AND RELATED SWAP POSITION
-      Object.assign(binding, {
-        host       : node[WebComponent.ELEMENT_OF],
-        hostKey    : node[WebComponent.NORMALIZED_NAME],
-        related    : node[WebComponent.INSTANCE_OF],
-        relatedKey : tag.key
-      });
+      //
+      // ATTEMPT TO ALLOW TWO WAY BINDING ON CUSTOM ELEMENT CHILD NODE TREE
+      // if (node.nodeType !== Node.ATTRIBUTE_NODE && !node[WebComponent.IS_SHADOW]) {
+      //   return externalBinding();
+      // }
+      return selfBinding();
     } else {
-      Object.assign(binding, {
-        host       : node[WebComponent.INSTANCE_OF],
-        hostKey    : tag.key,
-        related    : node[WebComponent.ELEMENT_OF],
-        relatedKey : node[WebComponent.NORMALIZED_NAME]
-      });
-      //IF RELATED IS TEXTCONTENT OF A NODE
-      //THEN USE THE NODE ITSELF AS RELATED
-      if (binding.relatedKey === '#text') binding.related = node;
+      return internalBinding();
     }
-    return binding;
   }
   _registerProperties(node) {
     const tags        = WebComponent.searchBindingTags(node._originalContent),
@@ -373,7 +397,6 @@ class WebComponent extends CoreWebComponent {
       const name         = WebComponent.normalizeNodeName(bindings[0].hostKey),
             relatedValue = WebComponent.getObj(bindings[0].related, bindings[0].relatedKey),
             prevValue    = this[name];
-      //console.log('WILL SEt', this, name, relatedValue, prevValue, bindings);
       this.preset(name, relatedValue, prevValue);
     }
 
@@ -400,10 +423,17 @@ class WebComponent extends CoreWebComponent {
 
     return bindings;
   }
-  _dig(node) {
+  _dig(node, definitions = {}) {
     if (!node.hasOwnProperty(WebComponent.INSTANCE_OF)) {
       Object.defineProperty(node, WebComponent.INSTANCE_OF, {value: WebComponent.searchForHostComponent(node)});
     }
+
+    if (node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+      if (definitions.shadow && !node.hasOwnProperty(WebComponent.IS_SHADOW)) {
+        Object.defineProperty(node, WebComponent.IS_SHADOW, {value: true});
+      }
+    }
+
     if (!node.hasOwnProperty(WebComponent.NORMALIZED_NAME)) {
       Object.defineProperty(node, WebComponent.NORMALIZED_NAME, {value: WebComponent.normalizeNodeName(node.nodeName)});
     }
@@ -436,10 +466,11 @@ class WebComponent extends CoreWebComponent {
 
     // DO NOT ALLOW ELEMENT DIGGING INTO ANOTHER WEBCOMPONENT
     if (isAllowedToDig) {
-      bindings = bindings.concat([...node.childNodes].map(this._dig, this));
+      bindings = bindings.concat([...node.childNodes]
+                         .map((n) => this._dig(n, definitions), this));
     }
     if (hasShadowRoot) {
-      bindings = bindings.concat(this._dig(node.shadowRoot));
+      bindings = bindings.concat(this._dig(node.shadowRoot, {shadow: true}));
     }
     return WebComponent.flattenArray(bindings);
   }
