@@ -276,7 +276,15 @@ class WebComponent extends CoreWebComponent {
     if (node.nodeType === Node.ATTRIBUTE_NODE) { node = node._ownerElement; }
     const parent = node.parentNode;
     if (!parent) { return node.host; }
-    if (parent instanceof WebComponent) { return parent; }
+    if (parent instanceof WebComponent) return parent;
+    //FALLBACK TO GENERAL CUSTOM-ELEMENT AS PARENT
+    //IN CASE MODULE HASN’T BEEN DOWNLOADED
+    //LOOKS UP FOR ELEMENTS WITH HYPEN I.E: APP-FOO
+    //WILL POTENTIALLY NEED TO CHANGE THIS SINCE IT WOULDN’T PLAY
+    //WELL WITH OTHER CUSTOM ELEMENT LIBRARIES IN THE SAME PROJECT
+    if (parent.nodeType === Node.ELEMENT_NODE && /-/.test(parent.nodeName))  {
+      return parent;
+    }
     return WebComponent.searchForHostComponent(parent);
   }
   static groupBindings(array) {
