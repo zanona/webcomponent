@@ -65,6 +65,22 @@ module.exports = function (polyfillURL) {
     script.addEventListener('load', polyfill);
 
     self.addEventListener('WebComponentsReady', () => {
+      //OVERRIDE THE WAY SHADOW CSS ADD STYLES TO A SINGLE TAG
+      //ALLOW EACH COMPONENT TO HAVE THEIR OWN STYLE TAG
+      //THIS WILL PREVENT REFRESHING IMAGES PREVIOUSLY LOADED, ETC
+      //IF STYLE TEXTCONTENT HAS BEEN UPDATED
+      self.WebComponents.ShadowCSS.addCssToDocument = function (cssText, name) {
+        const prev  = document.querySelector(`style[${name}]`);
+        if (prev) {
+          prev.textContent = cssText;
+        } else {
+          const style = document.createElement('style');
+          style.setAttribute(name, '');
+          style.setAttribute('shim-shadowdom-css', '');
+          style.textContent = cssText;
+          document.head.appendChild(style);
+        }
+      };
       dispatchReadyEvent();
     });
   } else {
