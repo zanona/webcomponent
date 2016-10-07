@@ -411,7 +411,7 @@ class WebComponent extends CoreWebComponent {
 
       if (tags.length) {
         if (typeof relatedValue === 'undefined' ||
-            typeof relatedValue === 'function'  ||
+            //typeof relatedValue === 'function'  ||
             typeof prevValue    === 'function') return bindings;
         this.preset(name, relatedValue, prevValue);
       } else {
@@ -544,8 +544,7 @@ class WebComponent extends CoreWebComponent {
         // IF RELATED COMPONENT IS NOT READY (HAS NOT BEEN ANALYZED)
         // LEAVE TO THE _RegisterProperties METHOD TO ASSIGN IT WHEN
         // THE RELATED COMPONENT IS CREATED
-        if (relatedReady || typeof value === 'function') {
-          //console.log('LISTENER', this, listener.related, key, prevValue, value);
+        if (relatedReady && typeof value !== 'function') {
           listener.related.preset(listener.relatedKey, value, prevValue);
         }
       }
