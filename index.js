@@ -72,17 +72,18 @@ class CoreWebComponent extends HTMLElement {
     Object.defineProperty(this, key, newDescriptor);
   }
   createdCallback() {
-    Object.defineProperty(this, '_bindings', { value: {} });
-
-    if (this.constructor.template) { this.linkTemplate(); }
-
     // ADJUST DESCRIPTOR FOR INITAL class properties
     // ALLOWING FUNCTIONALITY SUCH AS
     // `SET KEY(VALUE) {...}` OR `GET KEY() {...}`
+    // COMES AS FIRST SO OTHER METHOS HAVE ALL PROPERTIES DEFINED
+    // FOR PARSING (I.E: _FINDMETHODSCOPE);
     Object
       .getOwnPropertyNames(this.constructor.prototype)
       .forEach(this.addDescriptor, this);
 
+    Object.defineProperty(this, '_bindings', { value: {} });
+
+    if (this.constructor.template) { this.linkTemplate(); }
     if (this.created) this.created();
   }
   attachedCallback() {
@@ -300,20 +301,26 @@ class WebComponent extends CoreWebComponent {
     return nodeName.replace(/\-(\w)/g, (_, l) => l.toUpperCase());
   }
 
+  _lookupMethodOnScope(method, scope) {
+    //COMPARE AGAINST ALL AVAILABLE PROPERTIES ON OBJECT
+    //RATHER THAN UNRELIABLE FN.NAME THAT CAN BE CHANGED
+    //THROUGH POST-PROCESSING
+    const keys = Object.getOwnPropertyNames(scope);
+    return keys.find((k) => scope[k] === method);
+  }
   _findMethodScope(method, key) {
     let scope = this[WebComponent.INSTANCE_OF];
-    while (scope && scope[method.name] !== method) scope = scope[WebComponent.INSTANCE_OF];
 
+    while (scope && !this._lookupMethodOnScope(method, scope)) {
+      scope = scope[WebComponent.INSTANCE_OF]; //GO UP
+    }
     //IF IT CANT FIND ON PARENT LOOK FOR BINDINGS
     if (!scope) {
       //ONCE HITS TOPMOST LEVEL, LOOK FOR BINDINGS
       //CHECKING SCOPE RELATION HORIZONTALLY
       const bindings = this._bindings[key];
-      if (bindings) {
-        scope = bindings[0].related;
-      }
+      if (bindings) scope = bindings[0].related;
     }
-
     return scope;
   }
   _updateSelfBindings(bindings) {
