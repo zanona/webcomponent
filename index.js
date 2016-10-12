@@ -449,7 +449,9 @@ class WebComponent extends CoreWebComponent {
       Object.defineProperty(node, WebComponent.ORIGINAL_CONTENT, {value: node.textContent});
     }
     if (node.nodeType === Node.ATTRIBUTE_NODE) {
-      return this._registerProperties(node);
+      // PREVENT EXTENDING STYLE ATTRIBUTES
+      // SINCE IT WOULD CONFLICT WITH CSS PARSER
+      if (node.name !== 'style') return this._registerProperties(node);
     }
     if (node.nodeType === Node.TEXT_NODE) {
       Object.defineProperty(node, WebComponent.ELEMENT_OF, {value: node.parentNode});
