@@ -576,7 +576,12 @@ class WebComponent extends CoreWebComponent {
 
     if (shouldProceed) this.set(key, value);
   }
-  set(key, value) {
+  set(key, value, opts) {
+    // IF FORCE ATTRIBUTE IS TRUE
+    // CLONE OBJECT IN ORDER TO RE-REFRESH LISTENERS
+    if (opts && opts.force && typeof value === 'object' && value !== null) {
+      value = JSON.parse(JSON.stringify(value));
+    }
     const prevValue = WebComponent.getObj(this, key);
     // IF PROPERTY IS A METHOD
     // BIND IT TO THE INSTANCE OWNER
