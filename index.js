@@ -403,7 +403,7 @@ class WebComponent extends CoreWebComponent {
     if (tags.length && nodeOwner instanceof WebComponent && nodeOwner !== this) {
       const name         = WebComponent.normalizeNodeName(bindings[0].hostKey),
             relatedValue = WebComponent.getObj(bindings[0].related, bindings[0].relatedKey),
-            prevValue    = this[name];
+            prevValue    = WebComponent.getObj(this, name);
       this.preset(name, relatedValue, prevValue);
     }
 
