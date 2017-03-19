@@ -42,7 +42,7 @@ class Module {
           pathname = this.location(ownerDoc.baseURI).pathname;
 
     if (template && exported) { exported.attachTemplate(template); }
-    if (exported.extends) { this.extendComponent(exported); }
+    if (exported && exported.extends) { this.extendComponent(exported); }
 
     this.imported[tagName] = exported;
     this.importedMap[pathname] = tagName;
