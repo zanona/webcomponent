@@ -96,6 +96,9 @@ class CoreWebComponent extends HTMLElement {
     //FIXME SAFARI DOING SOME STRANGE THINGS
     if (!this._ownerInstance) { 
       console.log(this.treeScope);
+      console.log(this);
+      console.log(this._class);
+      if (this._class) console.log(this._class.treeScope);
 
       return console.log('NO PARENT FOUND', this);
     }
