@@ -94,13 +94,11 @@ class CoreWebComponent extends HTMLElement {
     //REMOVE BINDINGS RELATED TO ELEMENT ONCE DETACHED
 
     //FIXME SAFARI DOING SOME STRANGE THINGS
-    if (!this._ownerInstance) { 
-      setTimeout(this._ownerInstance);
-      console.log(this.treeScope_);
+    if (!this._ownerInstance && !this.treeScope_ && !this.treeScope_.parent) { 
       return console.log('NO PARENT FOUND', this);
     }
 
-    const parent = this._ownerInstance,
+    const parent = this._ownerInstance || this.treeScope_.parent,
           bindingKeys = parent._bindings;
 
     for (const key in bindingKeys) {
